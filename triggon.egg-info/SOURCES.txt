@@ -1,0 +1,14 @@
+LICENSE
+README.md
+pyproject.toml
+triggon/__init__.py
+triggon/_debug.py
+triggon/_exceptions.py
+triggon/_var_analysis.py
+triggon/_var_update.py
+triggon/trig_func.py
+triggon/triggon.py
+triggon.egg-info/PKG-INFO
+triggon.egg-info/SOURCES.txt
+triggon.egg-info/dependency_links.txt
+triggon.egg-info/top_level.txt
