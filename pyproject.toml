@@ -30,6 +30,8 @@ maintainers = [
 ]
 
 [project.urls]
-"Repository" = "https://github.com/tsuruko12/triggon"
+Homepage = "https://github.com/tsuruko12/triggon"
+Source = "https://github.com/tsuruko12/triggon"
+Bug Tracker = "https://github.com/tsuruko12/triggon/issues"
 
 
