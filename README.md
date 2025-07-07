@@ -30,10 +30,10 @@ This section explains how to use each function.
 ### Triggon
 `Triggon(self, label: str | dict[str, Any], /, new: Any=None, *, debug: bool=False)`
 
-`Triggon()` is initialized with label-value pairs.
+`Triggon()` is initialized with label-value pairs.  
 You can pass a single label with its value, or multiple labels using a dictionary.
 
-If you pass multiple values to a label using a list,
+If you pass multiple values to a label using a list,  
 each value will correspond to index 0, 1, 2, and so on, in the order you provide.
 
 ```python
@@ -57,7 +57,7 @@ example()
 # Output: 100 -> 0
 ```
 
-When passing a list or tuple that should be used as a single value,
+When passing a list or tuple that should be used as a single value,  
 make sure to wrap it in another list or tuple to avoid it being unpacked.
 
 ```python
@@ -125,18 +125,20 @@ s.set_mode(True)
 
 If you want to trace label activity in real time, set the `debug` keyword to `True`.
 
-> **Note:** 
-Labels with the * prefix cannot be used during initialization 
+> ⚠️ **Note:** 
+Labels with the `*` prefix cannot be used during initialization 
 and will raise an `InvalidArgumentError`.
 
 ### set_trigger
 `def set_trigger(self, label: str | list[str] | tuple[str, ...], /) -> None`
 
-Marks the specified label(s) as triggered, allowing their values to be updated on the next call.
-All values associated with the specified label will be changed, regardless of their index.
+Marks the specified label(s) as triggered, 
+allowing their values to be updated on the next call.  
+All values associated with the specified label will be changed, regardless of their index.  
 The `label` parameter accepts a single string or a list/tuple of labels.
 
-If any of the specified labels have been disabled using `revert()`, this function has no effect on them.
+If any of the specified labels have been disabled using `revert()`, 
+this function has no effect on them.
 
 ```python
 from triggon import Triggon
@@ -175,8 +177,8 @@ example()
 ### alter_literal
 `def alter_literal(self, label: str, /, org: Any, *, index: int=None) -> Any`
 
-Changes a literal value when the flag is set to `True`.
-You can also use this function directly inside a print().
+Changes a literal value when the flag is set to `True`.  
+You can also use this function directly inside a print().  
 When using a dictionary for `label`, the `index` keyword cannot be used.
 
 ```python
@@ -197,11 +199,11 @@ example() # Output: Before
 example() # Output: After
 ```
 
-Alternatively, you can use the `*` character as a prefix to specify the index.
+Alternatively, you can use the `*` character as a prefix to specify the index.  
 For example, `"label"` refers to index 0, and `"*label"` refers to index 1.
 
-You can use the `index` keyword or the `*` prefix.
-When both are provided, the keyword takes precedence.
+You can use the `index` keyword or the `*` prefix.  
+When both are provided, the keyword takes precedence.  
 `*` used elsewhere (not as a prefix) is ignored and has no special meaning.
 
 ```python
@@ -231,16 +233,16 @@ it's recommended to use the `index` keyword.
 ### alter_var
 `def alter_var(self, label: str | dict[str, Any], var: Any=None, /, *, index: int=None) -> None`
 
-Changes variable value(s) directly when the flag is set to `True`.
+Changes variable value(s) directly when the flag is set to `True`.  
 It supports global variables and class attributes, but not local variables.
 
-You can pass multiple labels and variables using a dictionary.
-The `index` keyword cannot be used in that case.
+You can pass multiple labels and variables using a dictionary.    
+The `index` keyword cannot be used in that case.  
 If the target index is 1 or greater, 
-add a `*` prefix to the label corresponding to the index 
+add a `*` prefix to the label corresponding to the index  
 (e.g., `*label` for index 1, `**label` for index 2).
 
-In such cases, it is recommended to use individual calls to this function 
+In such cases, it is recommended to use individual calls to this function  
 with the `index` keyword instead, for better readability.
 
 ```python
@@ -309,21 +311,22 @@ print(f"a: {exm.a}, b: {exm.b}, c: {exm.c}")
 ```
 
 > **Notes:** 
-Values are typically updated when `set_trigger()` is called.
+Values are typically updated when `set_trigger()` is called.  
 However, on the first call, 
-the value won't change unless the variable has been registered via `alter_var()`.
-In that case, the value is changed by `alter_var()`.
-Once registration is complete, each call to `set_trigger()` immediately updates the value.
+the value won't change unless the variable has been registered via `alter_var()`.  
+In that case, the value is changed by `alter_var()`.  
+Once registration is complete, each call to `set_trigger()` immediately updates the value.  
 
 The `index` keyword does not accept a variable — only integer literals are allowed.
 
 ### revert
 `def revert(self, label: str, /, *, disable: bool=False) -> None`
 
-Reverts all values previously changed by `alter_literal()` or `alter_var()` 
-to their original state.
-The reversion remains effective until the next call to `set_trigger()`. 
-All values associated with the specified label will be reverted, regardless of their index.
+Reverts all values previously changed by `alter_literal()` or `alter_var()`  
+to their original state.  
+The reversion remains effective until the next call to `set_trigger()`.  
+All values associated with the specified label will be reverted, 
+regardless of their index.
 
 If the `disable` keyword is set to `True`, the reversion becomes permanent.
 
@@ -390,19 +393,19 @@ example()
 ### exit_point
 `def exit_point(self, label: str, func: TrigFunc, /) -> None | Any`
 
-Defines the exit point where an early return is triggered by `trigger_return()`.
-The `func` argument must be a `TrigFunc` instance that wraps the target function.
+Defines the exit point where an early return is triggered by `trigger_return()`.  
+The `func` argument must be a `TrigFunc` instance that wraps the target function.  
 
 An index with the `*` prefix can be used, but it is ignored.
 
 ### trigger_return
 `trigger_return(self, label: str, /, *, index: int=None, do_print: bool=False) -> None | Any`
 
-Triggers an early return with any value when the flag is set to `True`.
-The return value must be set during initialization.
+Triggers an early return with any value when the flag is set to `True`.  
+The return value must be set during initialization.  
 If nothing needs to be returned, set it to `None`.
 
-If the `do_print` keyword is set to `True`, the return value will be printed.
+If the `do_print` keyword is set to `True`, the return value will be printed.  
 If the value is not a string, an `InvalidArgumentError` is raised.
 
 ```python
@@ -443,10 +446,10 @@ tg.exit_point("skip", F.check_funds(200))
 ### trigger_func
 `def trigger_func(self, label: str, func: TrigFunc, /) -> None | Any`
 
-Triggers a function when the flag is set to `True`.
+Triggers a function when the flag is set to `True`.  
 The `func` argument must be a `TrigFunc` instance that wraps the target function.
 
-The label must be initialized with `None` when creating the `Triggon` instance.
+The label must be initialized with `None` when creating the `Triggon` instance.  
 An index with the `*` prefix can be used, but it is ignored.
 
 If the function returns a value, it will also be returned.
@@ -485,7 +488,8 @@ This class wraps a function to delay its execution.
 You can create an instance without any arguments and use it to wrap the target function.
 
 > **Note:**
-When using this class, you must create an instance first (e.g., F = TrigFunc()) before using it.
+When using this class,  
+you must create an instance first (e.g., F = TrigFunc()) before using it.
 
 ### Error
 - `InvalidArgumentError`  
@@ -496,6 +500,6 @@ This project is licensed under the MIT License.
 See [LICENSE](./LICENSE) for details.
 
 ## Author
-Created by Tsuruko
+Created by Tsuruko  
 GitHub: [@tsuruko12](https://github.com/tsuruko12)  
 X: [@tool_tsuruko12](https://x.com/tsuruko)
