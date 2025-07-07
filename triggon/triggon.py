@@ -136,6 +136,8 @@ class Triggon:
           "'label' must be a string, "
           "or a list/tuple containing only strings."
         )
+      
+      self._clear_frame()
 
     def alter_literal(
         self, label: str, /, org: Any, *, index: int=None,
@@ -163,6 +165,7 @@ class Triggon:
       if self.debug:
         self._get_target_frame("alter_literal")
         self._print_val_debug(name, index, flag, org)
+        self._clear_frame()
 
       if not flag:
         return self._org_value[name][index]
@@ -172,7 +175,7 @@ class Triggon:
     def alter_var(
           self, label: str | dict[str, Any], var: Any=None, /, 
           *, index: int=None,
-    ) -> None:
+    ) -> None | Any:
         """
         Change the value of variables associated with the given label 
         if the flag is active.
@@ -212,9 +215,6 @@ class Triggon:
             self._init_arg_list(change_list, arg_type, index)
             init_flag = True
 
-          if not init_flag:
-            return
-
           trig_flag = self._trigger_flag[name]
           vars = self._var_list[name][index]
 
@@ -225,10 +225,12 @@ class Triggon:
               self._print_var_debug(
                 vars, name, index, trig_flag, change_list[label],
               )   
-            self._drop_debug_info()
+            self._clear_frame()
 
-            return
-          
+            return var
+          elif not init_flag:
+             return var
+
           self._update_var_value(vars, self._new_value[name][index])  
 
           if self.debug:
@@ -236,8 +238,12 @@ class Triggon:
               vars, name, index, trig_flag, change_list[label], 
               self._new_value[name][index], change=True,
             )
+          self._clear_frame()
+
+          return var
         else:
            # When multiple labels are provided in a dictionary
+
           if index is not None:
             raise InvalidArgumentError(
               "Cannot use the `index` keyword with a dictionary. " 
@@ -287,7 +293,7 @@ class Triggon:
                 self._new_value[name][index], change=True,
               )
             
-        self._drop_debug_info()
+          self._clear_frame()
 
     def revert(self, label: str, /, *, disable: bool=False) -> None:
       """
