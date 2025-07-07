@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: triggon
-Version: 0.1.0b0
+Version: 0.1.0b1
 Summary: Automatically switches values at labeled trigger points, supporting multi-value switching, early returns, and function calls.
 Author-email: Tsuruko <tsuruko-12@outlook.com>
 Maintainer-email: Tsuruko <tsuruko-12@outlook.com>
