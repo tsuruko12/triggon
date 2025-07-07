@@ -34,12 +34,12 @@ class Triggon:
         *, debug: bool=False,
     ) -> None:
       """
-      Registers labels and their corresponding values.
+      ラベルとその値を登録します。
+ 
+      値は配置位置に基づいてインデックスが割り振られます。
+      配列を１つの値として設定したい場合は、さらに別の配列に入れてください。
 
-      Values must be passed in the order of their index positions.
-      To treat a sequence as a single value, wrap it in another sequence.
-
-      Accepted formats:
+      対応形式:
       - label, value
       - label, [value]
       - label, (value,)
@@ -66,17 +66,17 @@ class Triggon:
 
           if index != 0:
               raise InvalidArgumentError(
-                  f"Please remove the '*' prefix from `{key}`. " 
-                  "To specify by index, "
-                  "provide the values in index order using a list or tuple."
+                  f" `{key}`の先頭にある '*' をすべて取り除いてください。 "
+                  "インデックスを指定するために, "
+                  "リスト/タプル内に任意のインデックスの位置に値を配置してください。"
               )
 
           try:
             self._new_value[label]
 
             raise InvalidArgumentError(
-              f"`{label}` already exists." 
-              "Duplicate labels are not allowed for this function."
+              f"`{label}`はすでに登録済みです"
+              "この関数では重複したラベルは登録できません。"
             ) 
           except KeyError:
             self._add_new_label(label, value)
@@ -102,13 +102,13 @@ class Triggon:
         else:
           self._new_value[label] = value
       else:
-        # Unwrapped single value
+        # 配列ではない単一の値
         self._new_value[label] = (value,)
         
       self._trigger_flag[label] = False
       self._disable_label[label] = False
 
-      # Create a list of None values—one for each index of this label
+      # 送られた値のインデックスの数だけNoneを設定する
       self._org_value[label] = [None] * length
       self._var_list[label] = [None] * length
       self._id_list[label] = [None] * length
@@ -117,10 +117,10 @@ class Triggon:
         self, label: str | list[str] | tuple[str, ...], /,
     ) -> None:
       """
-      Activates the trigger flag for the given label(s).
-
-      If variables were registered via `alter_var()`, 
-      their values will be updated when the flag is activated.
+      引数のラベルのフラグをTrueに設定します。
+ 
+      `alter_var()`によって変数が登録されてる場合, 
+      この関数内で値が更新されます。
       """
 
       if (
@@ -141,11 +141,9 @@ class Triggon:
         self, label: str, /, org: Any, *, index: int=None,
     ) -> Any:
       """
-      Changes the value at the specified label and position 
-      if the flag is active.
-
-      Only accepts immediate values
-      (e.g., literals or expressions).
+      引数のラベルのフラグがTrueの場合、その値を変更します。
+ 
+      変数以外の式やリテラルのみ対応しています。
       """
 
       _check_label_type(label)
@@ -174,21 +172,21 @@ class Triggon:
           *, index: int=None,
     ) -> None:
         """
-        Change the value of variables associated with the given label 
-        if the flag is active.
-
-        Only supports variable references (not literals or expressions).
-
-        Supports updating:
-        - Global variables
-        - Class attributes (fields)
+        引数のラベルのフラグがTrueの場合、
+        その変数の値を変更します。
+ 
+        変数のみ対応しています。（式やリテラル以外）
+ 
+        対応変数の種類:
+        - グローバル変数
+        - クラス変数
         """
 
         (change_list, arg_type) = _handle_arg_types(label, var, index, True)
         init_flag = False
 
         if len(change_list) == 1:
-          # When only one label is provided
+          # 単一のラベルの場合
           label = next(iter(change_list))
           _check_label_type(label)
 
@@ -208,7 +206,7 @@ class Triggon:
             self._get_target_frame("alter_var")
             self._lineno = self._frame.f_lineno     
 
-            # Initial process to store argument variables 
+            # 変数保存の初回処理
             self._init_arg_list(change_list, arg_type, index)
             init_flag = True
 
@@ -237,7 +235,7 @@ class Triggon:
               self._new_value[name][index], change=True,
             )
         else:
-           # When multiple labels are provided in a dictionary
+           # 複数のラベルの場合（辞書）
           if index is not None:
             raise InvalidArgumentError(
               "Cannot use the `index` keyword with a dictionary. " 
@@ -261,7 +259,7 @@ class Triggon:
               self._get_target_frame("alter_var")
               self._lineno = self._frame.f_lineno
 
-               # Initial process to store argument variables
+               # 変数保存の初回処理
               self._init_arg_list(change_list, arg_type)
               init_flag = True
             
@@ -291,8 +289,8 @@ class Triggon:
 
     def revert(self, label: str, /, *, disable: bool=False) -> None:
       """
-      Revert the trigger flag of the specified label to False.
-      If `disable` is set to True, the label will be permanently disabled.
+      引数のラベルのフラグをFalseに設定します。
+      'disable'がTrueに設定された場合、永続的にフラグをFalseにします。
       """
       
       name = label.lstrip(SYMBOL)
@@ -302,10 +300,10 @@ class Triggon:
         return
 
       if disable:
-        state = "disable" # for debug
+        state = "disable" # デバッグ用
         self._disable_label[name] = True
       else:
-        state = "inactive" # for debug
+        state = "inactive" # デバッグ用
       self._trigger_flag[name] = False
 
       self._label_has_var(name, "revert", True)
@@ -316,8 +314,8 @@ class Triggon:
     
     def exit_point(self, label: str, func: TrigFunc, /) -> None | Any:
       """
-      Handles an early return triggered by `trigger_return()`,  
-      based on the specified label.
+      引数と同じラベルの`trigger_return()`によって実行された早期リターンは、
+      `func`に渡された関数のところまで処理が戻ります。
       """
 
       name = label.lstrip(SYMBOL)
@@ -335,11 +333,11 @@ class Triggon:
         self, label: str, /, *, index: int=None, do_print: bool=False,
     ) -> None | Any:
         """
-        Executes an early return using the set return value,  
-        if the trigger flag is active.
-
-        If `do_print` is True, prints the value with the early return.  
-        Raises `InvalidArgumentError` if the value is not a string.
+        引数のラベルのフラグがTrueの場合、
+        早期リターンを実行と共に設定された値を返します。
+ 
+        `do_print`がTrueの場合、早期リターンで設定された値を出力します。
+        値が文字列でない場合、`InvalidArgumentError`が発生します。
         """
 
         name = label.lstrip(SYMBOL)
@@ -354,8 +352,8 @@ class Triggon:
         if do_print:
             if not isinstance(self._new_value[name][index], str):
               raise InvalidArgumentError(
-                 "Expected a value of type `str`, "
-                 f"but got `{type(self._new_value[name][index]).__name__}`."
+                 "値は文字列である必要がありますが、"
+                 f"`{type(self._new_value[name][index]).__name__}`が渡されました。"
               )         
         self._return_value = (do_print, self._new_value[name][index])
 
@@ -367,8 +365,7 @@ class Triggon:
         
     def trigger_func(self, label: str, func: TrigFunc, /) -> None | Any:
         """
-        Executes the given function 
-        if the trigger flag for the label is active.
+        引数のラベルのフラグがTrueの場合、`func`に渡された関数を実行します。
         """
 
         name = label.lstrip(SYMBOL)
