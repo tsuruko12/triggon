@@ -142,7 +142,7 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
                 linecache.clearcache()
                 break
 
-          # If result is 1, the value is already registered
+          # If result is 1, this is not the target function
           if result == 1:
             linecache.clearcache()
             break     
@@ -195,7 +195,7 @@ def _arg_is_seq(
 
     if target_index is None:
       self._var_list[label][index] = []
-    elif target_index is not None and not isinstance(target_index, list):
+    elif not isinstance(target_index, list):
        # convert to a list for adding values.
        self._var_list[label][index] = [target_index]
 
