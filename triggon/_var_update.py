@@ -19,13 +19,13 @@ def _update_var_value(
     self, 
     var_ref: tuple[Any] | list[tuple[Any]], update_value: Any,
 ) -> None:
-    # var_ref can be:
-    # - (lineno, var_name) for globals
-    # - (lineno, attr_name, instance) for class attributes
-    # - a list of either form
+    # 変数情報:
+    # - グローバル変数 -> (行番号, 変数名)
+    # - クラス変数 -> (行番号, 属性名, クラスインスタンス)
+    # またはリストにこれらが複数入っている
 
     if isinstance(var_ref, list):
-        # When multiple variables are provided, a list is used
+        # 複数の値の場合は、リストに入れられている
         for value in var_ref:
             if len(value) == 3:
                 setattr(value[2], value[1], update_value)
@@ -70,7 +70,8 @@ def _label_has_var(
 
     self._get_target_frame(called_func)
 
-    # Restore all variables to their original or new values 
+    # 特定ラベルの全ての登録されてる変数を、
+    # 元の値または、設定された値に更新する
     for i in range(len(self._var_list[label])):
         arg = self._var_list[label][i]
 
