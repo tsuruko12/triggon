@@ -10,10 +10,10 @@ from ._exceptions import (
 )
 
 
-LABEL_ERROR = "Label must be a string"
-VALUE_TYPE_ERROR = "Please use variables for the values."
-NEST_ERROR = "Nesting is not allowed in lists or tuples in this function."
-VAR_ERROR = "Local arguments are not supported in this function."
+LABEL_ERROR = "ラベルは文字列で渡してください。"
+VALUE_TYPE_ERROR = "`value`には変数を入れてください。"
+NEST_ERROR = "この関数では配列内でネストすることは出来ません。"
+VAR_ERROR = "ローカル変数は対応していません。"
 
 
 def _init_arg_list(
@@ -24,7 +24,7 @@ def _init_arg_list(
     else:
        has_index = True
 
-    # store IDs to verify the arguments
+    # 変数を照合するためのIDを保存
     for key, val in change_list.items():   
         name = key.lstrip(SYMBOL)
         self._check_exist_label(name)
@@ -62,7 +62,7 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
       try:
         line_range = ast.parse("".join(lines))
 
-        # walk through AST nodes to find function calls
+        # 呼び出されたの関数を見つけるためにASTノードを巡回
         
         for node in ast.walk(line_range):
           if not isinstance(node, ast.Call):
@@ -76,7 +76,7 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
 
           first_arg = node.args[0]
 
-          # handle each argument type differently
+          # 引数の型によって処理が分岐
 
           if arg_type == ast.Dict and isinstance(first_arg, ast.Dict):
             result = self._arg_is_dict(first_arg)
@@ -102,7 +102,7 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
 
              name = label.lstrip(SYMBOL)       
 
-             # check if 'index' keyword is set
+             # `index`キーワードが設定されてるかの確認
              if 0 < len(node.keywords) <= 3:
                 index = None
 
@@ -115,10 +115,10 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
                    if isinstance(index_node, ast.Constant):
                       index = index_node.value
                    else:
-                      # Currently supports only literal values for `index`.
-                      # Variable-based values might be supported in the future.
+                      # 現在は`index`にはリテラル値のみ使えますが、
+                      # 将来的に変数にも対応するかもしれません。
                       raise InvalidArgumentError(
-                         "The `index` keyword must be a literal value."   
+                         "`index` キーワードにはリテラル値を入れてください。"    
                       )                    
 
                 if index is None:
@@ -142,19 +142,19 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
                 linecache.clearcache()
                 break
 
-          # If result is 1, this is not the target function
+          # resultが１の場合は目的の関数ではない
           if result == 1:
             linecache.clearcache()
             break     
           return
 
-      # skip lines where the code is incomplete 
-      # (e.g., multi-line function call not finished yet)
+      # 関数が一行で終わっていない場合、このエラーは無視。
+      # （その関数の終わりの行を探すため）
       except SyntaxError:
         continue
 
     raise RuntimeError(
-       "Expected call to 'alter_var' was not found in the source file"
+       "ソースコード内の`alter_var' が見つかりませんでした。"
     )   
   
 def _arg_is_dict(self, target: ast.Dict) -> int:
@@ -167,7 +167,7 @@ def _arg_is_dict(self, target: ast.Dict) -> int:
         return 1
       index = _count_symbol(key)
 
-      # handle each argument type differently
+      # 引数の型によって処理が分岐
 
       if isinstance(val, (ast.List, ast.Tuple)):
         result = self._arg_is_seq(val, label, index)
@@ -196,7 +196,7 @@ def _arg_is_seq(
     if target_index is None:
       self._var_list[label][index] = []
     elif not isinstance(target_index, list):
-       # convert to a list for adding values.
+       # 値を追加するためリストに変換
        self._var_list[label][index] = [target_index]
 
     for i, val in enumerate(target.elts):
@@ -229,7 +229,7 @@ def _arg_is_name(
        raise InvalidArgumentError(VAR_ERROR)
 
     target_index = self._var_list[label][index]
-    # (line number, var name)
+    # (行番号, 変数名)
     if isinstance(target_index, list):
       self._var_list[label][index].append((self._lineno, target))
     elif target_index is not None:
@@ -259,7 +259,7 @@ def _arg_is_attr(
     
     target_index = self._var_list[label][index]
 
-    # (line number, attr name, class instance)
+    # (行番号, 属性名, クラスインスタンス)
     if isinstance(target_index, list):
       self._var_list[label][index].append(
          (self._lineno, target.attr, instance)
@@ -290,7 +290,7 @@ def _get_list_id(
          
    
 def _deduplicate_labels(target: ast.Dict) -> dict[str, ast.AST]:
-    # remove duplicate labels by converting to a set
+    # 重複したラベルを排除する
     sorted_list = {}
 
     for key, val in zip(target.keys, target.values):
