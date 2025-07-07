@@ -4,12 +4,13 @@ from typing import Any, Callable
 
 class TrigFunc:
   """
-  Delays function execution for use with `trigger_return()` or `trigger_func()`.
-
-  Use this wrapper to pass functions without calling them.
-
-  You must assign the instance (e.g., F = TrigFunc()) 
-  before calling the trigger function.
+  `trigger_return()` と `trigger_func()`を使う際に、
+  引数に入れる関数の実行を遅延させます。
+ 
+  対象関数を包んで引数に渡してください。
+ 
+  必ずクラスインスタンス変数を作成してから使ってください。
+  (例： F = TrigFunc()) 
   """
 
   _func: Callable | None
