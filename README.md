@@ -487,7 +487,7 @@ tg.exit_point("skip", F.example())
 This class wraps a function to delay its execution.   
 You can create an instance without any arguments and use it to wrap the target function.
 
-> **Note:**
+> ⚠️ **Note:**  
 When using this class,  
 you must create an instance first (e.g., F = TrigFunc()) before using it.
 
