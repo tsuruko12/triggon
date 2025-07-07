@@ -1,5 +1,5 @@
 # Contributing triggon
-Thank you for your interest in contributing to **triggon**!
+Thank you for your interest in contributing to **triggon**!  
 This library is still in beta, so your help is more than welcome.
 
 ## Guidelines
