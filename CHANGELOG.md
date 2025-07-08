@@ -16,4 +16,4 @@ All notable changes to this project will be documented in this file.
 - `alter_var()` now returns the value when a single label is passed
 
 ### Fixed
-- Bug where `inspect.currentframe()` failed to retrieve the correct frame at the specific point
+- Bug where an incorrect frame was retrieved in a specific situation
