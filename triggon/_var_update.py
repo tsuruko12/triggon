@@ -109,3 +109,9 @@ def _get_target_frame(self, target_name: str) -> None:
          return
       frame = frame.f_back
 
+def _clear_frame(self) -> None:
+   # 'self._frame = None' 
+   # is to prevent memory leak by releasing the frame reference
+   self._frame = None
+   self._lineno = None
+
