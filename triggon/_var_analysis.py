@@ -23,6 +23,9 @@ def _init_arg_list(
        has_index = False
     else:
        has_index = True
+        
+    # 最後にIDを入れた部分をリセットしてNoneの状態にするため(初期状態)
+    copied_dict = copy.deepcopy(self._id_list)
 
     # 変数を照合するためのIDを保存
     for key, val in change_list.items():   
@@ -50,17 +53,22 @@ def _init_arg_list(
     file_name = self._frame.f_code.co_filename 
     self._trace_func_call(file_name, arg_type)
 
+    self._id_list = copied_dict
+
 def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
-    lines = []
+    lines = ""
     
     for i in count(self._lineno):
       line = linecache.getline(file_name, i)
       if not line:
         break
-      lines.append(line.lstrip())
+      lines += line
 
       try:
-        line_range = ast.parse("".join(lines))
+        line_range = ast.parse(lines.lstrip())  
+      except SyntaxError:
+        # インデントエラーや複数行に関数が渡ってる場合のエラーは無視する。
+        continue
 
         # 呼び出されたの関数を見つけるためにASTノードを巡回
         
@@ -98,10 +106,8 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
                 label = first_arg.value
              else:
                 linecache.clearcache()
-                break
-
-             name = label.lstrip(SYMBOL)       
-
+                break     
+                 
              # `index`キーワードが設定されてるかの確認
              if 0 < len(node.keywords) <= 3:
                 index = None
@@ -122,9 +128,11 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
                       )                    
 
                 if index is None:
-                   index = _count_symbol(name)
+                   index = _count_symbol(label)
              else:
-                index = _count_symbol(name)
+                index = _count_symbol(label)
+
+              name = label.lstrip(SYMBOL)  
           
              if (
                 arg_type == ast.List 
@@ -147,11 +155,6 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
             linecache.clearcache()
             break     
           return
-
-      # 関数が一行で終わっていない場合、このエラーは無視。
-      # （その関数の終わりの行を探すため）
-      except SyntaxError:
-        continue
 
     raise RuntimeError(
        "ソースコード内の`alter_var' が見つかりませんでした。"
@@ -233,10 +236,14 @@ def _arg_is_name(
     if isinstance(target_index, list):
       self._var_list[label][index].append((self._lineno, target))
     elif target_index is not None:
-       self._var_list[label][index] = [target_index]
+       if isinstance(target_index, list):
+          self._var_list[label][index] = [target_index]
+
        self._var_list[label][index].append((self._lineno, target))
     else:
        self._var_list[label][index] = (self._lineno, target)
+
+    return 0
 
     return 0
 
@@ -265,7 +272,9 @@ def _arg_is_attr(
          (self._lineno, target.attr, instance)
       )
     elif target_index is not None:
-       self._var_list[label][index] = [target_index]
+       if not isinstance(target_index, list):
+         self._var_list[label][index] = [target_index]
+
        self._var_list[label][index].append(
           (self._lineno, target.attr, instance)
        )
