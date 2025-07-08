@@ -28,14 +28,29 @@ def _update_var_value(
         # When multiple variables are provided, a list is used
         for value in var_ref:
             if len(value) == 3:
+                cur_value = var_ref[2].__dict__[var_ref[1]]
+                if cur_value == update_value:
+                    continue
+
                 setattr(value[2], value[1], update_value)
             else:
-                self._frame.f_globals[value[1]] = update_value   
+                cur_value = self._frame.f_globals[value[1]]
+                if cur_value == update_value:
+                    continue 
 
+                self._frame.f_globals[value[1]] = update_value   
     else:     
         if len(var_ref) == 3:
+            cur_value = var_ref[2].__dict__[var_ref[1]]
+            if cur_value == update_value:
+                return
+            
             setattr(var_ref[2], var_ref[1], update_value)
         else:  
+            cur_value = self._frame.f_globals[var_ref[1]]
+            if cur_value == update_value:
+                return
+            
             self._frame.f_globals[var_ref[1]] = update_value
 
 def _check_exist_label(self, label: str) -> None:
@@ -56,7 +71,7 @@ def _check_label_flag(self, label: str) -> None:
 
     if self.debug:
         self._get_target_frame("set_trigger")
-        self._print_flag_debug(name, "active", reset=False)   
+        self._print_flag_debug(name, "active", reset=False)
 
 def _label_has_var(
     self, label: str, called_func: str, to_org: bool,
@@ -79,25 +94,33 @@ def _label_has_var(
             continue
         elif isinstance(arg, list):
             for i_2, v in enumerate(arg):
-                if not isinstance(update_value[i], tuple):
+                if not isinstance(update_value[i], (list, tuple)):
                     self._update_var_value(v, update_value[i])
                     continue            
 
                 self._update_var_value(v, update_value[i][i_2])
-                if self.debug:
-                  self._print_var_debug(True, value[1], update_value[i][i_2], change=True)
         else:
             self._update_var_value(arg, update_value[i])     
 
 def _is_new_var(self, label: str, index: int, value: Any) -> bool:
     if self._trigger_flag[label]:
-        if self._new_value[label][index] == value:
+        if isinstance(value, (list, tuple)):
+            if self._new_value[label][index] in value:
+                return False
+        else:  
+            self._new_value[label][index] == value
             return False
-    
-        return True
-    
-    if self._org_value[label][index] == value:
-        return False
+        
+        return True  
+        
+    if isinstance(value, list):
+        if self._org_value[label][index] == value:
+            return False
+    elif isinstance(value, tuple):
+        if tuple(self._org_value[label][index]) == value:
+            return False
+    elif self._org_value[label][index] == value:
+            return False
     
     return True
 
