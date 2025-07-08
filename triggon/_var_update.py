@@ -30,7 +30,8 @@ def _update_var_value(
             if len(value) == 3:
                 setattr(value[2], value[1], update_value)
             else:
-                self._frame.f_globals[value[1]] = update_value    
+                self._frame.f_globals[value[1]] = update_value   
+
     else:     
         if len(var_ref) == 3:
             setattr(var_ref[2], var_ref[1], update_value)
@@ -80,8 +81,11 @@ def _label_has_var(
             for i_2, v in enumerate(arg):
                 if not isinstance(update_value[i], tuple):
                     self._update_var_value(v, update_value[i])
-                    continue                              
+                    continue            
+
                 self._update_var_value(v, update_value[i][i_2])
+                if self.debug:
+                  self._print_var_debug(True, value[1], update_value[i][i_2], change=True)
         else:
             self._update_var_value(arg, update_value[i])     
 
@@ -106,12 +110,11 @@ def _get_target_frame(self, target_name: str) -> None:
    while frame:
       if frame.f_code.co_name == target_name:
          self._frame = frame.f_back
-         return
+         return     
       frame = frame.f_back
 
 def _clear_frame(self) -> None:
-   # 'self._frame = None' 
-   # is to prevent memory leak by releasing the frame reference
+   # to prevent memory leak by releasing the frame reference
    self._frame = None
    self._lineno = None
 
