@@ -28,13 +28,29 @@ def _update_var_value(
         # 複数の値の場合は、リストに入れられている
         for value in var_ref:
             if len(value) == 3:
+                cur_value = var_ref[2].__dict__[var_ref[1]]
+                if cur_value == update_value:
+                    continue
+
                 setattr(value[2], value[1], update_value)
             else:
-                self._frame.f_globals[value[1]] = update_value    
+                cur_value = self._frame.f_globals[value[1]]
+                if cur_value == update_value:
+                    continue 
+
+                self._frame.f_globals[value[1]] = update_value   
     else:     
         if len(var_ref) == 3:
+            cur_value = var_ref[2].__dict__[var_ref[1]]
+            if cur_value == update_value:
+                return
+            
             setattr(var_ref[2], var_ref[1], update_value)
         else:  
+            cur_value = self._frame.f_globals[var_ref[1]]
+            if cur_value == update_value:
+                return
+            
             self._frame.f_globals[var_ref[1]] = update_value
 
 def _check_exist_label(self, label: str) -> None:
@@ -79,22 +95,33 @@ def _label_has_var(
             continue
         elif isinstance(arg, list):
             for i_2, v in enumerate(arg):
-                if not isinstance(update_value[i], tuple):
+                if not isinstance(update_value[i], (list, tuple)):
                     self._update_var_value(v, update_value[i])
-                    continue                              
+                    continue            
+
                 self._update_var_value(v, update_value[i][i_2])
         else:
-            self._update_var_value(arg, update_value[i])     
+            self._update_var_value(arg, update_value[i])  
 
 def _is_new_var(self, label: str, index: int, value: Any) -> bool:
     if self._trigger_flag[label]:
-        if self._new_value[label][index] == value:
+        if isinstance(value, (list, tuple)):
+            if self._new_value[label][index] in value:
+                return False
+        else:  
+            self._new_value[label][index] == value
             return False
-    
-        return True
-    
-    if self._org_value[label][index] == value:
-        return False
+        
+        return True  
+        
+    if isinstance(value, list):
+        if self._org_value[label][index] == value:
+            return False
+    elif isinstance(value, tuple):
+        if tuple(self._org_value[label][index]) == value:
+            return False
+    elif self._org_value[label][index] == value:
+            return False
     
     return True
 
@@ -109,4 +136,9 @@ def _get_target_frame(self, target_name: str) -> None:
          self._frame = frame.f_back
          return
       frame = frame.f_back
+
+def _clear_frame(self) -> None:
+   # メモリリークを防ぐために、処理後に`None`に設定する
+   self._frame = None
+   self._lineno = None
 
