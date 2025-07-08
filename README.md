@@ -223,17 +223,18 @@ example()
 > **Note:**  複数のインデックスを扱う場合は、可読性のため`index`キーワードの使用を推奨します。
 
 ### alter_var
-`def alter_var(self, label: str | dict[str, Any], var: Any=None, /, *, index: int=None) -> None`
-
-def alter_var(self, label: str | dict[str, Any], var: Any=None, /, *, index: int=None) -> None
+`def alter_var(self, label: str | dict[str, Any], var: Any=None, /, *, index: int=None) -> None | Any`
 
 トリガーが `True` に設定されているとき、変数の値を直接変更します。  
-対応しているのはグローバル変数とクラス属性で、ローカル変数には対応していません。  
+**対応しているのはグローバル変数とクラス属性で、ローカル変数には対応していません。**
 
 複数のラベルと変数を辞書形式で渡すこともできます。  
 その場合、`index` キーワードは使用できません。  
 対象インデックスが1以上の場合は、  
 ラベルに対応する接頭辞として `*` を追加してください（例：index 1 → *label、index 2 → **label）。
+
+**単一のラベルで渡された場合のみ、引数の値を返します。**  
+辞書型で渡された場合は`None`を返します。
 
 もしインデックスが大きくなる場合は、  
 個別に関数を呼び出し、`index` キーワードを使って指定することを推奨します。
