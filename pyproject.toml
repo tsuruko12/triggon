@@ -32,6 +32,6 @@ maintainers = [
 [project.urls]
 Homepage = "https://github.com/tsuruko12/triggon"
 Source = "https://github.com/tsuruko12/triggon"
-Bug Tracker = "https://github.com/tsuruko12/triggon/issues"
+"Bug Tracker" = "https://github.com/tsuruko12/triggon/issues"
 
 
