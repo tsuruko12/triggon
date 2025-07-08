@@ -1,3 +1,9 @@
+# triggon
+
+[![PyPI](https://img.shields.io/pypi/v/triggon)](https://pypi.org/project/triggon/)
+![Python](https://img.shields.io/pypi/pyversions/triggon)
+![Python](https://img.shields.io/pypi/l/triggon)
+
 # 概要
 特定のトリガーポイントで単体または複数の値を動的に切り替えるライブラリです。
 
@@ -313,7 +319,7 @@ print(f"a: {exm.a}, b: {exm.b}, c: {exm.c}")
 `index`キーワードには、整数リテラルのみが使用可能です。
 
 ### revert
-`def revert(self, label: str, /, *, disable: bool=False) -> None`
+`def revert(self, label: str | list[str] | tuple[str, ...], /, *, disable: bool=False) -> None`
 
 `alter_literal()` または `alter_var()` によって変更された値を、元の状態に戻します。  
 この復元状態は、次に `set_trigger()` が呼び出されるまで有効です。  
