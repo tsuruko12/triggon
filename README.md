@@ -1,5 +1,9 @@
 # triggon
 
+[![PyPI](https://img.shields.io/pypi/v/triggon)](https://pypi.org/project/triggon/)
+![Python](https://img.shields.io/pypi/pyversions/triggon)
+![Python](https://img.shields.io/pypi/l/triggon)
+
 ## Overview
 Dynamically switch multiple values at specific trigger points.
 
@@ -10,7 +14,6 @@ Dynamically switch multiple values at specific trigger points.
 - [Usage](#usage)
 - [License](#license)
 - [Author](#author)
-
 
 ## Features
 - Switch multiple values at once with a single trigger point.
@@ -323,7 +326,7 @@ Once registration is complete, each call to `set_trigger()` immediately updates 
 The `index` keyword does not accept a variable — only integer literals are allowed.
 
 ### revert
-`def revert(self, label: str, /, *, disable: bool=False) -> None`
+`def revert(self, label: str | list[str] | tuple[str, ...], /, *, disable: bool=False) -> None`
 
 Reverts all values previously changed by `alter_literal()` or `alter_var()`  
 to their original state.  
