@@ -231,16 +231,19 @@ For better readability when working with multiple indices,
 it's recommended to use the `index` keyword.
 
 ### alter_var
-`def alter_var(self, label: str | dict[str, Any], var: Any=None, /, *, index: int=None) -> None`
+`def alter_var(self, label: str | dict[str, Any], var: Any=None, /, *, index: int=None) -> None | Any`
 
 Changes variable value(s) directly when the flag is set to `True`.  
-It supports global variables and class attributes, but not local variables.
+**It supports global variables and class attributes, but not local variables.**
 
 You can pass multiple labels and variables using a dictionary.    
 The `index` keyword cannot be used in that case.  
 If the target index is 1 or greater, 
 add a `*` prefix to the label corresponding to the index  
 (e.g., `*label` for index 1, `**label` for index 2).
+
+This function returns the updated value **only when a single label is passed**.  
+If a dictionary is passed, the function returns `None`.
 
 In such cases, it is recommended to use individual calls to this function  
 with the `index` keyword instead, for better readability.
