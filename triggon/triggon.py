@@ -3,6 +3,7 @@ from typing import Any
 
 from ._exceptions import (
     SYMBOL,
+    LABEL_TYPE_ERROR,
     _ExitEarly,
     InvalidArgumentError, 
     _check_label_type,
@@ -123,19 +124,18 @@ class Triggon:
       この関数内で値が更新されます。
       """
 
-      if (
-        isinstance(label, (list, tuple)) 
-        and all(isinstance(val, str) for val in label)
-      ):
-        for v in label:
-          self._check_label_flag(v)
+      if isinstance(label, (list, tuple)):
+        for name in label:
+          if not isinstance(name, str):
+             raise InvalidArgumentError(LABEL_TYPE_ERROR)
+
+          self._check_label_flag(name)
       elif isinstance(label, str):
         self._check_label_flag(label)       
       else:
-        raise InvalidArgumentError(
-          "'label' must be a string, "
-          "or a list/tuple containing only strings."
-        )
+        raise InvalidArgumentError(LABEL_TYPE_ERROR)
+      
+      self._clear_frame()
 
     def alter_literal(
         self, label: str, /, org: Any, *, index: int=None,
@@ -161,16 +161,17 @@ class Triggon:
       if self.debug:
         self._get_target_frame("alter_literal")
         self._print_val_debug(name, index, flag, org)
+        self._clear_frame()
 
       if not flag:
         return self._org_value[name][index]
 
-      return self._new_value[name][index]  
+      return self._new_value[name][index]
 
     def alter_var(
           self, label: str | dict[str, Any], var: Any=None, /, 
           *, index: int=None,
-    ) -> None:
+    ) -> None | Any:
         """
         引数のラベルのフラグがTrueの場合、
         その変数の値を変更します。
@@ -210,9 +211,6 @@ class Triggon:
             self._init_arg_list(change_list, arg_type, index)
             init_flag = True
 
-          if not init_flag:
-            return
-
           trig_flag = self._trigger_flag[name]
           vars = self._var_list[name][index]
 
@@ -223,10 +221,12 @@ class Triggon:
               self._print_var_debug(
                 vars, name, index, trig_flag, change_list[label],
               )   
-            self._drop_debug_info()
+            self._clear_frame()
 
-            return
-          
+            return var
+          elif not init_flag:
+             return var
+
           self._update_var_value(vars, self._new_value[name][index])  
 
           if self.debug:
@@ -234,6 +234,9 @@ class Triggon:
               vars, name, index, trig_flag, change_list[label], 
               self._new_value[name][index], change=True,
             )
+          self._clear_frame()
+
+          return var
         else:
            # 複数のラベルの場合（辞書）
           if index is not None:
@@ -280,19 +283,35 @@ class Triggon:
 
             if self.debug:
               self._get_target_frame("alter_var")
+                
               self._print_var_debug(
                 vars, name, index, trig_flag, val, 
                 self._new_value[name][index], change=True,
               )
             
-        self._drop_debug_info()
+        self._clear_frame()
 
-    def revert(self, label: str, /, *, disable: bool=False) -> None:
+    def revert(
+          self, label: str | list[str] | tuple[str, ...], /, 
+          *, disable: bool=False,
+    ) -> None:
       """
       引数のラベルのフラグをFalseに設定します。
       'disable'がTrueに設定された場合、永続的にフラグをFalseにします。
       """
       
+      if isinstance(label, (list, tuple)):
+        for name in label:
+          if not isinstance(name, str):
+            raise InvalidArgumentError(LABEL_TYPE_ERROR)
+          
+          self._revert_label(name, disable)
+      elif isinstance(label, str):
+        self._revert_label(label, disable)
+      else:
+        raise InvalidArgumentError(LABEL_TYPE_ERROR)   
+
+　  def _revert_label(self, label: str, disable: bool) -> None:
       name = label.lstrip(SYMBOL)
       self._check_exist_label(name)
 
@@ -310,7 +329,8 @@ class Triggon:
 
       if self.debug:
         self._get_target_frame("revert")
-        self._print_flag_debug(name, state)
+        self._print_flag_debug(name, state)    
+        self._clear_frame()  
     
     def exit_point(self, label: str, func: TrigFunc, /) -> None | Any:
       """
