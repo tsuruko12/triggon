@@ -66,8 +66,7 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
       lines += line
 
       try:
-        line_range = ast.parse(lines.lstrip())
-      
+        line_range = ast.parse(lines.lstrip())  
       except SyntaxError:
         # Skip lines where the code is incomplete,
         # such as unfinished multi-line function calls,
@@ -109,9 +108,7 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
              elif isinstance(first_arg, ast.Constant):
                 label = first_arg.value
              else:
-                raise InvalidArgumentError(LABEL_ERROR)
-
-             name = label.lstrip(SYMBOL)       
+                raise InvalidArgumentError(LABEL_ERROR)      
 
              # check if 'index' keyword is set
              if 0 < len(node.keywords) <= 3:
@@ -133,10 +130,12 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
                       )                    
 
                 if index is None:
-                   index = _count_symbol(name)
+                   index = _count_symbol(label)
              else:
-                index = _count_symbol(name)
-          
+                index = _count_symbol(label)
+
+             name = label.lstrip(SYMBOL) 
+
              if (
                 arg_type == ast.List 
                 and isinstance(second_arg, (ast.List, ast.Tuple))
@@ -151,6 +150,7 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
                 result = self._arg_is_attr(second_arg, name, index)
              else:
                 continue
+             
           # If result is 1, this is not the target function
           if result == 1:
              continue  
@@ -199,7 +199,7 @@ def _arg_is_seq(
     if target_index is None:
       self._var_list[label][index] = []
     elif not isinstance(target_index, list):
-       # convert to a list for adding values.
+       # convert to a list for adding values
        self._var_list[label][index] = [target_index]
 
     for i, val in enumerate(target.elts):
@@ -225,18 +225,21 @@ def _arg_is_name(
     target_id = self._get_list_id(label, index, inner_index)
     if target_id is None:
        return 1
-
+    
     try:
        self._frame.f_globals[target]
     except KeyError:
        raise InvalidArgumentError(VAR_ERROR)
 
     target_index = self._var_list[label][index]
+
     # (line number, var name)
     if isinstance(target_index, list):
       self._var_list[label][index].append((self._lineno, target))
     elif target_index is not None:
-       self._var_list[label][index] = [target_index]
+       if isinstance(target_index, list):
+          self._var_list[label][index] = [target_index]
+
        self._var_list[label][index].append((self._lineno, target))
     else:
        self._var_list[label][index] = (self._lineno, target)
@@ -268,7 +271,9 @@ def _arg_is_attr(
          (self._lineno, target.attr, instance)
       )
     elif target_index is not None:
-       self._var_list[label][index] = [target_index]
+       if not isinstance(target_index, list):
+         self._var_list[label][index] = [target_index]
+
        self._var_list[label][index].append(
           (self._lineno, target.attr, instance)
        )
@@ -284,7 +289,7 @@ def _get_list_id(
 
     if isinstance(target_id, list):
        if inner_index is not None and len(target_id) > inner_index:
-         return target_id[inner_index]
+         return target_id[inner_index]   
        return None
     elif inner_index is not None:
       return None
