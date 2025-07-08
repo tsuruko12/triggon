@@ -1,4 +1,5 @@
 import ast
+import copy
 import linecache
 from itertools import count
 
