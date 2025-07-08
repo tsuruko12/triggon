@@ -2,6 +2,7 @@ from types import FrameType
 from typing import Any
 
 from ._exceptions import (
+    LABEL_TYPE_ERROR,
     SYMBOL,
     _ExitEarly,
     InvalidArgumentError, 
@@ -122,20 +123,17 @@ class Triggon:
       If variables were registered via `alter_var()`, 
       their values will be updated when the flag is activated.
       """
+    
+      if isinstance(label, (list, tuple)):
+        for name in label:
+          if not isinstance(name, str):
+             raise InvalidArgumentError(LABEL_TYPE_ERROR)
 
-      if (
-        isinstance(label, (list, tuple)) 
-        and all(isinstance(val, str) for val in label)
-      ):
-        for v in label:
-          self._check_label_flag(v)
+          self._check_label_flag(name)
       elif isinstance(label, str):
         self._check_label_flag(label)       
       else:
-        raise InvalidArgumentError(
-          "'label' must be a string, "
-          "or a list/tuple containing only strings."
-        )
+        raise InvalidArgumentError(LABEL_TYPE_ERROR)
       
       self._clear_frame()
 
@@ -260,14 +258,14 @@ class Triggon:
               self._store_org_value(name, index, val)
 
             if (
-              not init_flag
-              and (self._var_list[name][index] is None 
-              or self._is_new_var(name, index, val))
+               not init_flag
+               and (self._var_list[name][index] is None 
+               or self._is_new_var(name, index, val))
             ):    
               self._get_target_frame("alter_var")
               self._lineno = self._frame.f_lineno
 
-               # Initial process to store argument variables
+              # Initial process to store argument variables
               self._init_arg_list(change_list, arg_type)
               init_flag = True
             
@@ -288,6 +286,7 @@ class Triggon:
 
             if self.debug:
               self._get_target_frame("alter_var")
+
               self._print_var_debug(
                 vars, name, index, trig_flag, val, 
                 self._new_value[name][index], change=True,
@@ -295,12 +294,27 @@ class Triggon:
             
           self._clear_frame()
 
-    def revert(self, label: str, /, *, disable: bool=False) -> None:
+    def revert(
+          self, label: str | list[str] | tuple[str, ...], /, 
+          *, disable: bool=False,
+    ) -> None:
       """
       Revert the trigger flag of the specified label to False.
       If `disable` is set to True, the label will be permanently disabled.
       """
-      
+
+      if isinstance(label, (list, tuple)):
+        for name in label:
+          if not isinstance(name, str):
+            raise InvalidArgumentError(LABEL_TYPE_ERROR)
+          
+          self._revert_label(name, disable)
+      elif isinstance(label, str):
+        self._revert_label(label, disable)
+      else:
+        raise InvalidArgumentError(LABEL_TYPE_ERROR)        
+
+    def _revert_label(self, label: str, disable: bool) -> None:
       name = label.lstrip(SYMBOL)
       self._check_exist_label(name)
 
@@ -318,7 +332,8 @@ class Triggon:
 
       if self.debug:
         self._get_target_frame("revert")
-        self._print_flag_debug(name, state)
+        self._print_flag_debug(name, state)    
+        self._clear_frame()  
     
     def exit_point(self, label: str, func: TrigFunc, /) -> None | Any:
       """
