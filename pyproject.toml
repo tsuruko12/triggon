@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "triggon"
-version = "0.1.0b0"
+version = "0.1.0b1"
 description = "Automatically switches values at labeled trigger points, supporting multi-value switching, early returns, and function calls."
 readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.13" 

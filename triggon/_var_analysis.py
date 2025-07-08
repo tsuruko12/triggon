@@ -1,4 +1,5 @@
 import ast
+import copy
 import linecache
 from itertools import count
 
@@ -10,7 +11,7 @@ from ._exceptions import (
 )
 
 
-LABEL_ERROR = "Label must be a string"
+LABEL_ERROR = "Label must be a string."
 VALUE_TYPE_ERROR = "Please use variables for the values."
 NEST_ERROR = "Nesting is not allowed in lists or tuples in this function."
 VAR_ERROR = "Local arguments are not supported in this function."
@@ -23,6 +24,9 @@ def _init_arg_list(
        has_index = False
     else:
        has_index = True
+
+    # to reset the ids to `None`
+    copied_dict = copy.deepcopy(self._id_list)
 
     # store IDs to verify the arguments
     for key, val in change_list.items():   
@@ -50,18 +54,26 @@ def _init_arg_list(
     file_name = self._frame.f_code.co_filename 
     self._trace_func_call(file_name, arg_type)
 
+    self._id_list = copied_dict
+
 def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
-    lines = []
+    lines = ""
     
     for i in count(self._lineno):
       line = linecache.getline(file_name, i)
       if not line:
         break
-      lines.append(line.lstrip())
+      lines += line
 
       try:
-        line_range = ast.parse("".join(lines))
-
+        line_range = ast.parse(lines.lstrip())
+      
+      except SyntaxError:
+        # Skip lines where the code is incomplete,
+        # such as unfinished multi-line function calls,
+        # or lines that would raise an `IndentationError`.
+        continue
+      else:
         # walk through AST nodes to find function calls
         
         for node in ast.walk(line_range):
@@ -71,7 +83,7 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
           if (
              not isinstance(node.func, ast.Attribute) 
              or node.func.attr != "alter_var"
-            ): 
+           ): 
             continue
 
           first_arg = node.args[0]
@@ -97,8 +109,7 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
              elif isinstance(first_arg, ast.Constant):
                 label = first_arg.value
              else:
-                linecache.clearcache()
-                break
+                raise InvalidArgumentError(LABEL_ERROR)
 
              name = label.lstrip(SYMBOL)       
 
@@ -139,22 +150,14 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
              ):
                 result = self._arg_is_attr(second_arg, name, index)
              else:
-                linecache.clearcache()
-                break
-
+                continue
           # If result is 1, this is not the target function
           if result == 1:
-            linecache.clearcache()
-            break     
+             continue  
           return
 
-      # skip lines where the code is incomplete 
-      # (e.g., multi-line function call not finished yet)
-      except SyntaxError:
-        continue
-
     raise RuntimeError(
-       "Expected call to 'alter_var' was not found in the source file"
+       "Expected call to 'alter_var' was not found in the source file."
     )   
   
 def _arg_is_dict(self, target: ast.Dict) -> int:
