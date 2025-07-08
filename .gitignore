@@ -3,5 +3,5 @@ __pycache__/
 dist/
 *.egg_info/
 *.egg
-_exceptions.py
-_debug.py
+triggon/_exceptions.py
+triggon/_debug.py
