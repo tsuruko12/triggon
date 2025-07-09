@@ -270,7 +270,7 @@ def spin_gacha():
 
     # 出力はランダムに変わります。
     # 例: result = 'level_2'の場合
-    print(f"{level}ソードを取得しました！") # 出力例: You pulled レアソード!
+    print(f"{level}ソードを取得しました！") # 出力例: レアソードソードを取得しました！
     print(f"攻撃力: {attack}")    # 出力例: 攻撃力: 100 
 
 spin_gacha()
