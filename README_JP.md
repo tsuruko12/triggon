@@ -22,6 +22,26 @@
 - 任意の戻り値付きで早期リターンが可能
 - トリガー時に他の関数へ自動ジャンプ可能
 
+## 追加予定の機能
+- `alter_var()` で、1つの変数に対して複数のインデックスの値に変更することができるようにします。
+
+### 🔧 実装予定の例
+```python
+tg = Triggon("A", (1, 2, 3))
+
+a = 0
+tg.set_trigger("A")
+
+tg.alter_var("A", a)           # index 0 の値に切り替え
+print(a)  # 出力: 1
+
+tg.alter_var("A", a, index=1)  # index 1 の値に切り替え
+print(a)  # 出力: 2
+
+tg.alter_var("A", a, index=2)  # index 2 の値に切り替え
+print(a)  # 出力: 3
+```
+
 ## インストール方法
 ```bash
 pip install triggon
