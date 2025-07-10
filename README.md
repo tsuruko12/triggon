@@ -25,6 +25,24 @@ Dynamically switch multiple values at specific trigger points.
 ## Upcoming Features
 - Support multiple indexed values for a single variable using `alter_var()`
 
+#### 🔧 Example (planned feature)
+
+```python
+tg = Triggon("A", (1, 2, 3))
+
+a = 0
+tg.set_trigger("A")
+
+tg.alter_var("A", a)           # Set a to the value at index 0
+print(a)  # Output: 1
+
+tg.alter_var("A", a, index=1)  # Set a to the value at index 1
+print(a)  # Output: 2
+
+tg.alter_var("A", a, index=2)  # Set a to the value at index 2
+print(a)  # Output: 3
+```
+
 ## Installation
 ```bash
 pip install triggon
