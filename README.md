@@ -22,6 +22,9 @@ Dynamically switch multiple values at specific trigger points.
 - Trigger early returns with optional return values.
 - Automatically jump to other functions at a trigger point.
 
+## Upcoming Features
+- Support multiple indexed values for a single variable using `alter_var()`
+
 ## Installation
 ```bash
 pip install triggon
