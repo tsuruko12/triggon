@@ -42,7 +42,7 @@ print(a)  # 出力: 2
 tg.alter_var("A", a, index=2)  # index 2 の値に切り替え
 print(a)  # 出力: 3
 ```
-### 🔧 trigger_returnの例（実装予定
+### 🔧 trigger_returnの例（実装予定）
 ```python
 tg = Triggon({
     "call": None,   
@@ -66,7 +66,7 @@ tg.set_trigger(["call", "return"])
 
 result = tg.exit_point("return", F.func_a(10))
 print(result) # 出力: -10
-```）
+```
 
 ## インストール方法
 ```bash
