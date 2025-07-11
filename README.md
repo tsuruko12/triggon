@@ -23,9 +23,10 @@ Dynamically switch multiple values at specific trigger points.
 - Automatically jump to other functions at a trigger point.
 
 ## Upcoming Features
-- Support multiple indexed values for a single variable using `alter_var()`
+- Support multiple indexed values for a single variable using `alter_var()`.
+- Support returning a value when `trigger_return()` is called with the ret keyword argument.
 
-#### 🔧 Example (planned feature)
+#### `alter_var()` example (planned)
 
 ```python
 tg = Triggon("A", (1, 2, 3))
@@ -41,6 +42,32 @@ print(a)  # Output: 2
 
 tg.alter_var("A", a, index=2)  # Set a to the value at index 2
 print(a)  # Output: 3
+```
+
+#### `trigger_return()` example (planned)
+```python
+tg = Triggon({
+    "call": None,   
+    "return": 100,
+})
+
+F = TrigFunc() 
+
+def func_a(num: int) -> int:
+    x = tg.trigger_func("call", F.func_b(num))
+
+    # The `ret` argument takes precedence over the value set for "return".
+    tg.trigger_return("return", ret=x) 
+
+    return num
+
+def func_b(num: int) -> int:
+    return -num
+
+tg.set_trigger(["call", "return"]) 
+
+result = tg.exit_point("return", F.func_a(10))
+print(result) # Output: -10
 ```
 
 ## Installation
@@ -424,6 +451,8 @@ Defines the exit point where an early return is triggered by `trigger_return()`.
 The `func` argument must be a `TrigFunc` instance that wraps the target function.  
 
 An index with the `*` prefix can be used, but it is ignored.
+
+> **Note:** `exit_point()` is not required if `trigger_return()` is not triggered.
 
 ### trigger_return
 `trigger_return(self, label: str, /, *, index: int=None, do_print: bool=False) -> None | Any`
