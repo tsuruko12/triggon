@@ -353,7 +353,7 @@ class Triggon:
           print(self._return_value[1])
 
     def trigger_return(
-        self, label: str, /, ret=None, 
+        self, label: str, /, ret: Any=None, 
         *, index: int=None, do_print: bool=False,
     ) -> None | Any:
         """
