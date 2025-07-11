@@ -353,7 +353,8 @@ class Triggon:
           print(self._return_value[1])
 
     def trigger_return(
-        self, label: str, /, ret=None, *, index: int=None, do_print: bool=False,
+        self, label: str, /, ret=None, 
+        *, index: int=None, do_print: bool=False,
     ) -> None | Any:
         """
         Executes an early return using the set return value,  
