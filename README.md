@@ -3,6 +3,7 @@
 [![PyPI](https://img.shields.io/pypi/v/triggon)](https://pypi.org/project/triggon/)
 ![Python](https://img.shields.io/pypi/pyversions/triggon)
 ![Python](https://img.shields.io/pypi/l/triggon)
+![Package Size](https://img.shields.io/badge/size-20.3KB-lightgrey)
 
 ## Overview
 Dynamically switch multiple values at specific trigger points.
