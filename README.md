@@ -24,8 +24,9 @@
 
 ## 追加予定の機能
 - `alter_var()` で、1つの変数に対して複数のインデックスの値に変更することができるようにします。
+- `trigger_return()`のキーワード引数で、戻り値を設定できるようにします。
 
-### 🔧 実装予定の例
+### 🔧 alter_varの例（実装予定）
 ```python
 tg = Triggon("A", (1, 2, 3))
 
@@ -40,6 +41,32 @@ print(a)  # 出力: 2
 
 tg.alter_var("A", a, index=2)  # index 2 の値に切り替え
 print(a)  # 出力: 3
+```
+
+### 🔧 trigger_returnの例（実装予定）
+```python
+tg = Triggon({
+    "call": None,   
+    "return": 100,
+})
+
+F = TrigFunc() 
+
+def func_a(num: int) -> int:
+    x = tg.trigger_func("call", F.func_b(num))
+
+    # `ret`キーワードが設定されてる場合、初期設定の変更値より優先されます
+    tg.trigger_return("return", ret=x) 
+
+    return num
+
+def func_b(num: int) -> int:
+    return -num
+
+tg.set_trigger(["call", "return"]) 
+
+result = tg.exit_point("return", F.func_a(10))
+print(result) # 出力: -10
 ```
 
 ## インストール方法
