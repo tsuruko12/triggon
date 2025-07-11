@@ -353,7 +353,7 @@ class Triggon:
           print(self._return_value[1])
 
     def trigger_return(
-        self, label: str, /, *, index: int=None, do_print: bool=False,
+        self, label: str, /, ret=None, *, index: int=None, do_print: bool=False,
     ) -> None | Any:
         """
         Executes an early return using the set return value,  
@@ -373,12 +373,23 @@ class Triggon:
             return 
             
         if do_print:
-            if not isinstance(self._new_value[name][index], str):
-              raise InvalidArgumentError(
-                 "Expected a value of type `str`, "
-                 f"but got `{type(self._new_value[name][index]).__name__}`."
-              )         
-        self._return_value = (do_print, self._new_value[name][index])
+           if ret is None and not isinstance(self._new_value[name][index], str):
+             raise InvalidArgumentError(
+                "Expected a value of type `str`, "
+                f"but got `{type(self._new_value[name][index]).__name__}`."
+             )   
+           elif ret is not None and not isinstance(ret, str):
+             raise InvalidArgumentError(
+                "Expected a value of type `str`, "
+                f"but got `{type(ret).__name__}`."
+             )
+
+        if ret is None:
+          value = self._new_value[name][index]
+        else:
+          value = ret   
+                    
+        self._return_value = (do_print, value)
 
         if self.debug:
           self._get_target_frame("trigger_return")
