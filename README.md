@@ -8,7 +8,12 @@
 ## Overview
 Dynamically switch multiple values at specific trigger points.
 
-> ⚠️ **This library is currently in beta. APIs may change in future releases, and bugs may still be present.**
+> ⚠️ **This library is currently in beta. 
+> APIs may change in future releases, and some bugs may still be present.**
+
+> ⚠️ Function names like `alter_var()` and `alter_literal()` will be renamed  
+> to `switch_var()` and `switch_lit()` in the next update.  
+> The old names will remain available during the beta period for compatibility.
 
 ## Table of Contents
 - [Installation](#installation)
