@@ -31,6 +31,7 @@
 ## 追加予定の機能
 - `alter_var()` で、1つの変数に対して複数のインデックスの値に変更することができるようにします。
 - `trigger_return()`のキーワード引数で、戻り値を設定できるようにします。
+- `set_trigger()` に式（例：x == 5）を使った条件付きの発動ができる `cond` オプションを追加
 
 ### 🔧 alter_varの例（実装予定）
 ```python
@@ -73,6 +74,21 @@ tg.set_trigger(["call", "return"])
 
 result = tg.exit_point("return", F.func_a(10))
 print(result) # 出力: -10
+```
+
+### 🔧 `set_trigger()`の例（実装予定）
+```python
+tg = Triggon("A", True)
+
+def example(num: int):
+    # "num == 0" が Trueの場合のみ、トリガーが発動する
+    tg.set_trigger("A", cond="num == 0") 
+
+    flag = tg.alter_literal("A", False)
+    print(flag)
+
+example(10) # 出力: False
+example(0)  # 出力: True
 ```
 
 ## インストール方法
