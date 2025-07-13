@@ -2,14 +2,14 @@ from types import FrameType
 from typing import Any
 
 from ._exceptions import (
-    LABEL_TYPE_ERROR,
-    SYMBOL,
     _ExitEarly,
-    InvalidArgumentError, 
+    InvalidArgumentError,
     _check_label_type,
     _compare_value_counts,
     _count_symbol,
     _handle_arg_types,
+    LABEL_TYPE_ERROR,
+    SYMBOL,
 )
 from . import _debug
 from . import _var_analysis
@@ -115,29 +115,34 @@ class Triggon:
       self._id_list[label] = [None] * length
 
     def set_trigger(
-        self, label: str | list[str] | tuple[str, ...], /,
+        self, label: str | list[str] | tuple[str, ...], /, *, cond: str=None,
     ) -> None:
       """
       Activates the trigger flag for the given label(s).
 
       If variables were registered via `alter_var()`, 
       their values will be updated when the flag is activated.
+
+      If `cond` is provided, it must be a valid comparison expression 
+      (e.g., `"x > 10"`, `"obj.count == 5"`). 
+      The expression is evaluated safely and the trigger will only be 
+      activated if the result is `True`.
       """
-    
+
       if isinstance(label, (list, tuple)):
         for name in label:
           if not isinstance(name, str):
              raise InvalidArgumentError(LABEL_TYPE_ERROR)
-
-          self._check_label_flag(name)
+          
+          self._check_label_flag(name, cond)
       elif isinstance(label, str):
-        self._check_label_flag(label)       
+        self._check_label_flag(label, cond)
       else:
         raise InvalidArgumentError(LABEL_TYPE_ERROR)
       
       self._clear_frame()
 
-    def alter_literal(
+    def switch_lit(
         self, label: str, /, org: Any, *, index: int=None,
     ) -> Any:
       """
@@ -170,7 +175,7 @@ class Triggon:
 
       return self._new_value[name][index]  
 
-    def alter_var(
+    def switch_var(
           self, label: str | dict[str, Any], var: Any=None, /, 
           *, index: int=None,
     ) -> None | Any:
@@ -204,21 +209,25 @@ class Triggon:
             self._var_list[name][index] is None 
             or self._is_new_var(name, index, var)
           ):
-            self._store_org_value(name, index, change_list[label])
- 
-            self._get_target_frame("alter_var")
+            self._get_target_frame(["switch_var", "alter_var"]) # Change later
             self._lineno = self._frame.f_lineno     
+
+            self._store_org_value(name, index, change_list[label])
 
             # Initial process to store argument variables 
             self._init_arg_list(change_list, arg_type, index)
+            
             init_flag = True
+
+          if init_flag:
+            self._find_match_var(name, index)
 
           trig_flag = self._trigger_flag[name]
           vars = self._var_list[name][index]
 
           if not trig_flag:
             if self.debug:
-              self._get_target_frame("alter_var")
+              self._get_target_frame(["switch_var", "alter_var"]) # Change later
 
               self._print_var_debug(
                 vars, name, index, trig_flag, change_list[label],
@@ -267,6 +276,8 @@ class Triggon:
 
               # Initial process to store argument variables
               self._init_arg_list(change_list, arg_type)
+              self._find_match_var(name, index)
+
               init_flag = True
             
             if not init_flag:
@@ -413,6 +424,11 @@ class Triggon:
               self._print_trig_debug(name, "Trigger a function") 
                     
             return func()
+        
+
+    # Old functions
+    alter_literal = switch_lit
+    alter_var = switch_var
 
 
 for name, func in vars(_var_analysis).items():
