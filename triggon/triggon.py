@@ -2,14 +2,14 @@ from types import FrameType
 from typing import Any
 
 from ._exceptions import (
-    SYMBOL,
-    LABEL_TYPE_ERROR,
     _ExitEarly,
-    InvalidArgumentError, 
+    InvalidArgumentError,
     _check_label_type,
     _compare_value_counts,
     _count_symbol,
     _handle_arg_types,
+    LABEL_TYPE_ERROR,
+    SYMBOL,
 )
 from . import _debug
 from . import _var_analysis
@@ -115,13 +115,17 @@ class Triggon:
       self._id_list[label] = [None] * length
 
     def set_trigger(
-        self, label: str | list[str] | tuple[str, ...], /,
+        self, label: str | list[str] | tuple[str, ...], /, *, cond: str=None,
     ) -> None:
       """
       引数のラベルのフラグをTrueに設定します。
  
       `alter_var()`によって変数が登録されてる場合, 
       この関数内で値が更新されます。
+
+      キーワード引数の`cond`には比較文を設定できます。
+      （例： `"x > 10"`, `"obj.count == 5"`）
+      結果がTrueの場合にラベルのフラグをTrueに設定します。
       """
 
       if isinstance(label, (list, tuple)):
@@ -129,15 +133,15 @@ class Triggon:
           if not isinstance(name, str):
              raise InvalidArgumentError(LABEL_TYPE_ERROR)
 
-          self._check_label_flag(name)
+          self._check_label_flag(name, cond)
       elif isinstance(label, str):
-        self._check_label_flag(label)       
+        self._check_label_flag(label, cond)       
       else:
         raise InvalidArgumentError(LABEL_TYPE_ERROR)
       
       self._clear_frame()
 
-    def alter_literal(
+    def switch_lit(
         self, label: str, /, org: Any, *, index: int=None,
     ) -> Any:
       """
@@ -168,7 +172,7 @@ class Triggon:
 
       return self._new_value[name][index]
 
-    def alter_var(
+    def switch_var(
           self, label: str | dict[str, Any], var: Any=None, /, 
           *, index: int=None,
     ) -> None | Any:
@@ -210,6 +214,9 @@ class Triggon:
             # 変数保存の初回処理
             self._init_arg_list(change_list, arg_type, index)
             init_flag = True
+
+          if init_flag:
+            self._find_match_var(name, index)
 
           trig_flag = self._trigger_flag[name]
           vars = self._var_list[name][index]
@@ -264,6 +271,8 @@ class Triggon:
 
                # 変数保存の初回処理
               self._init_arg_list(change_list, arg_type)
+              self._find_match_var(name, index)
+                
               init_flag = True
             
             if not init_flag:
@@ -397,6 +406,10 @@ class Triggon:
               self._print_trig_debug(name, "Trigger a function") 
                     
             return func()
+
+　　# 旧関数
+    alter_literal = switch_lit
+    alter_var = switch_var
 
 
 for name, func in vars(_var_analysis).items():
