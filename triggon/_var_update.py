@@ -59,19 +59,26 @@ def _check_exist_label(self, label: str) -> None:
     except KeyError:
         raise KeyError(f"`{label}` has not been set.")
 
-def _check_label_flag(self, label: str) -> None:
+def _check_label_flag(self, label: str, cond: str | None) -> None:
     name = label.lstrip(SYMBOL)
     self._check_exist_label(name)
 
     if self._disable_label[name] or self._trigger_flag[name]:
         return
     
-    self._trigger_flag[name] = True
+    if cond is not None:
+        self._get_target_frame("set_trigger")
+
+        if self._ensure_safe_cond(cond):
+            self._trigger_flag[name] = True
+    else:
+        self._trigger_flag[name] = True
+    
     self._label_has_var(name, "set_trigger", False)
 
     if self.debug:
         self._get_target_frame("set_trigger")
-        self._print_flag_debug(name, "active", reset=False)   
+        self._print_flag_debug(name, "active", reset=False)
 
 def _label_has_var(
     self, label: str, called_func: str, to_org: bool,
