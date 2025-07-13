@@ -298,7 +298,50 @@ def _get_list_id(
     else:
       return target_id
          
+def _ensure_safe_cond(self, expr: str) -> None | bool:
+   if not isinstance(expr, str):
+      raise InvalidArgumentError("'expr' must be a string if provided.")
+
+   allowed = (
+        ast.Expression,
+        ast.Compare, ast.Name, ast.Attribute, ast.Constant, ast.Load,
+        ast.Eq, ast.NotEq, ast.Lt, ast.Gt, ast.LtE, ast.GtE,
+        ast.BoolOp, ast.And, ast.Or, ast.UnaryOp, ast.Not,
+   )
+
+   try:
+      tree = ast.parse(expr, mode="eval")
+   except SyntaxError:
+      raise InvalidArgumentError(
+         "Invalid expression syntax. "
+         "Please ensure the expression is valid."
+      )
    
+   scope = {}
+
+   for node in ast.walk(tree):
+      if not isinstance(node, allowed):
+         raise InvalidArgumentError(
+            "Only comparison expressions "
+            "(e.g. `x > 10`, `a == b`) are allowed."
+         )
+      
+      if isinstance(node, ast.Name):
+         try:
+            var_value = self._frame.f_locals[node.id]
+         except KeyError:
+            pass
+         else:
+            scope[node.id] = var_value
+
+      if isinstance(node, ast.Attribute):
+         instance = self._frame.f_locals[node.value.id]
+         
+         scope[node.value.id] = instance
+    
+   return eval(expr, scope)
+
+
 def _deduplicate_labels(target: ast.Dict) -> dict[str, ast.AST]:
     # 重複したラベルを排除する
     sorted_list = {}
