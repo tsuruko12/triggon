@@ -31,6 +31,7 @@ Dynamically switch multiple values at specific trigger points.
 ## Upcoming Features
 - Support multiple indexed values for a single variable using `alter_var()`.
 - Support returning a value when `trigger_return()` is called with the ret keyword argument.
+- Add `cond` option for conditional activation using expressions (e.g., x == 5) in `set_trigger()`.
 
 #### `alter_var()` example (planned)
 
@@ -74,6 +75,21 @@ tg.set_trigger(["call", "return"])
 
 result = tg.exit_point("return", F.func_a(10))
 print(result) # Output: -10
+```
+
+#### `set_trigger()` example (planned)
+```python
+tg = Triggon("A", True)
+
+def example(num: int):
+    # If the condition "num == 0" is True, the trigger will activate
+    tg.set_trigger("A", cond="num == 0") 
+
+    flag = tg.alter_literal("A", False)
+    print(flag)
+
+example(10) # Output: False
+example(0)  # Output: True
 ```
 
 ## Installation
