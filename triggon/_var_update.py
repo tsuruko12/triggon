@@ -125,6 +125,51 @@ def _is_new_var(self, label: str, index: int, value: Any) -> bool:
     
     return True
 
+def _find_match_var(self, label: str, index: int) -> None:
+    # `revert()`で変数の変更前の値を探す
+
+    # `var_ref` は リスト
+    var_ref = self._var_list[label][index]
+
+    # `value` はリスト
+    for key, value in self._var_list.items(): 
+        # `list_val` はリスト、タプル、Noneのいずれか
+        for i, list_val in enumerate(value):
+            if list_val is None:
+                continue
+            elif isinstance(list_val, tuple) and isinstance(var_ref, tuple):
+                if self._is_ref_match(list_val, var_ref):
+                    self._org_value[label][index] = self._org_value[key][i]                 
+            elif isinstance(list_val, tuple) and isinstance(var_ref, list):
+                for i_2, ref_v in enumerate(var_ref):
+                    if self._is_ref_match(list_val, ref_v):
+                        self._org_value[label][index][i_2] = (
+                            self._org_value[key][i]
+                        )
+            elif isinstance(list_val, list) and isinstance(var_ref, tuple):
+                for i_2, l_v in enumerate(list_val):
+                    if self._is_ref_match(l_v, var_ref):
+                        self._org_value[label][index] = (
+                            self._org_value[key][i][i_2]
+                        )
+            else:
+                for ref_i, ref_val in enumerate(var_ref):
+                    for list_i, v in enumerate(list_val):
+                        if self._is_ref_match(v, ref_val):
+                            self._org_value[label][index][ref_i] = (
+                                self._org_value[key][i][list_i]
+                            )
+
+def _is_ref_match(
+        self,
+        list_val: tuple[str, ...], target_val: tuple[str, ...],
+) -> bool:
+    if len(list_val) == 2 and len(target_val) == 2:
+        return list_val[1] == target_val[1]
+
+    elif len(list_val) == 3 and len(target_val) == 3:
+        return list_val[1:] == target_val[1:]
+
 def _get_target_frame(self, target_name: str) -> None:
    if self._frame is not None:
       return
