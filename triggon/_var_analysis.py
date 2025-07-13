@@ -81,7 +81,7 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
 
           if (
              not isinstance(node.func, ast.Attribute) 
-             or node.func.attr != "alter_var"
+             or node.func.attr not in ["switch_var", "alter_var"]
            ): 
             continue
 
@@ -157,7 +157,8 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
           return
 
     raise RuntimeError(
-       "Expected call to 'alter_var' was not found in the source file."
+       "Expected call to 'alter_var' or `switch_var` was not found "
+       "in the source file."
     )   
   
 def _arg_is_dict(self, target: ast.Dict) -> int:
@@ -295,6 +296,49 @@ def _get_list_id(
       return None
     else:
       return target_id
+    
+def _ensure_safe_cond(self, expr: str) -> None | bool:
+   if not isinstance(expr, str):
+      raise InvalidArgumentError("'expr' must be a string if provided.")
+   
+   allowed = (
+        ast.Expression,
+        ast.Compare, ast.Name, ast.Attribute, ast.Constant, ast.Load,
+        ast.Eq, ast.NotEq, ast.Lt, ast.Gt, ast.LtE, ast.GtE,
+        ast.BoolOp, ast.And, ast.Or, ast.UnaryOp, ast.Not,
+   )
+
+   try:
+      tree = ast.parse(expr, mode="eval")
+   except SyntaxError:
+      raise InvalidArgumentError(
+         "Invalid expression syntax. "
+         "Please ensure the expression is valid."
+      )
+   
+   scope = {}
+
+   for node in ast.walk(tree):
+      if not isinstance(node, allowed):
+         raise InvalidArgumentError(
+            "Only comparison expressions "
+            "(e.g. `x > 10`, `a == b`) are allowed."
+         )
+      
+      if isinstance(node, ast.Name):
+         try:
+            var_value = self._frame.f_locals[node.id]
+         except KeyError:
+            pass
+         else:
+            scope[node.id] = var_value
+
+      if isinstance(node, ast.Attribute):
+         instance = self._frame.f_locals[node.value.id]
+         
+         scope[node.value.id] = instance
+    
+   return eval(expr, scope)
          
    
 def _deduplicate_labels(target: ast.Dict) -> dict[str, ast.AST]:
@@ -310,4 +354,5 @@ def _deduplicate_labels(target: ast.Dict) -> dict[str, ast.AST]:
 def _identify_arg(target: ast.AST) -> None:
     if isinstance(target, ast.Constant):
       raise InvalidArgumentError(VALUE_TYPE_ERROR)
+    
       
