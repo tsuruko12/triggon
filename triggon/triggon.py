@@ -327,7 +327,9 @@ class Triggon:
       elif isinstance(label, str):
         self._revert_label(label, disable)
       else:
-        raise InvalidArgumentError(LABEL_TYPE_ERROR)        
+        raise InvalidArgumentError(LABEL_TYPE_ERROR)    
+
+      self._clear_frame()      
 
     def _revert_label(self, label: str, disable: bool) -> None:
       name = label.lstrip(SYMBOL)
@@ -348,7 +350,6 @@ class Triggon:
       if self.debug:
         self._get_target_frame("revert")
         self._print_flag_debug(name, state)    
-        self._clear_frame()  
     
     def exit_point(self, label: str, func: TrigFunc, /) -> None | Any:
       """
