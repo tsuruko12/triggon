@@ -29,9 +29,11 @@
 - トリガー時に他の関数へ自動ジャンプ可能
 
 ## 追加予定の機能
-- `alter_var()` で、1つの変数に対して複数のインデックスの値に変更することができるようにします。
+- `alter_var()` (新関数名: `switch_var()`) で、1つの変数に対して複数のインデックスの値に変更することができるようにします。
 - `trigger_return()`のキーワード引数で、戻り値を設定できるようにします。
+- `alter_literal()` (新関数名: `switch_lit()`)で、複数のラベルを設定できるようにします。
 - `set_trigger()` に式（例：x == 5）を使った条件付きの発動ができる `cond` オプションを追加
+- `revert()`に全てのラベルを一括で指定できる`all`オプションを追加
 
 ### 🔧 `alter_var()`の例（実装予定）
 ```python
@@ -88,6 +90,32 @@ def example(num: int):
 
 example(10) # 出力: False
 example(0)  # 出力: True
+```
+
+### 🔧 `alter_literal()` & `revert()`の例（実装予定）
+```python
+tg = Triggon({
+    "X": 20,
+    "Y": 10,
+    "Zero": 0,
+})
+
+def sample(flag: bool=None):
+    tg.set_trigger(["X", "Y"], cond="flag")
+    tg.set_trigger("Zero", cond="flag is None")
+
+    # どちらかのラベルのトリガーがTrueの場合に、その変更値に変わります。
+    # 両方Trueに場合は、最後のトリガーの方を優先します。
+    x = tg.alter_literal(["X", "Zero"], org=10)
+    y = tg.alter_literal(["Y", "Zero"], org=20)
+
+    print(f"xの値: {x}, yの値: {y}")
+
+    tg.revert(all=True) # 全てのラベルのフラグをFalseにする
+
+sample(True)  # 出力: xの値: 20, yの値: 10
+sample(False) # 出力: xの値: 10, yの値: 20
+sample()      # 出力: xの値: 0, yの値: 0
 ```
 
 ## インストール方法
