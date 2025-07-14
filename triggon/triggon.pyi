@@ -16,7 +16,16 @@ class Triggon:
         self, label: str, /, org: Any, *, index: int=None,
     ) -> Any: ...
 
+    def switch_lit(
+        self, label: str, /, org: Any, *, index: int=None,
+    ) -> Any: ...
+
     def alter_var(
+          self, label: str | dict[str, Any], var: Any=None, /, 
+          *, index: int=None,
+    ) -> None | Any: ...
+
+    def switch_var(
           self, label: str | dict[str, Any], var: Any=None, /, 
           *, index: int=None,
     ) -> None | Any: ...
