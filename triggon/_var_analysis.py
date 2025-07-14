@@ -92,7 +92,13 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
           if arg_type == ast.Dict and isinstance(first_arg, ast.Dict):
             result = self._arg_is_dict(first_arg)
           else:
-             second_arg = node.args[1]
+             try:
+               second_arg = node.args[1]
+             except IndexError:
+                raise InvalidArgumentError(
+                   "Set any variable as the second argument."
+                )
+             
              _identify_arg(second_arg)
 
              if isinstance(first_arg, ast.Name):
@@ -303,9 +309,11 @@ def _ensure_safe_cond(self, expr: str) -> None | bool:
    
    allowed = (
         ast.Expression,
-        ast.Compare, ast.Name, ast.Attribute, ast.Constant, ast.Load,
-        ast.Eq, ast.NotEq, ast.Lt, ast.Gt, ast.LtE, ast.GtE,
-        ast.BoolOp, ast.And, ast.Or, ast.UnaryOp, ast.Not,
+        ast.Compare, ast.Name, ast.Attribute, ast.Constant, 
+        ast.Is, ast.IsNot, ast.In, ast.NotIn,
+        ast.Load, ast.Eq, ast.NotEq, ast.Lt, 
+        ast.Gt, ast.LtE, ast.GtE, ast.BoolOp, 
+        ast.And, ast.Or, ast.UnaryOp, ast.Not,
    )
 
    try:
