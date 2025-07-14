@@ -137,12 +137,18 @@ def _find_match_var(self, label: str, index: int) -> None:
 
     # `var_ref` は リスト
     var_ref = self._var_list[label][index]
+    stop_flag = False
 
     # `value` はリスト
     for key, value in self._var_list.items(): 
         # `list_val` はリスト、タプル、Noneのいずれか
         for i, list_val in enumerate(value):
-            if list_val is None:
+            if stop_flag:
+                break
+
+            if key == label:
+                stop_flag = True
+            elif list_val is None:
                 continue
             elif isinstance(list_val, tuple) and isinstance(var_ref, tuple):
                 if self._is_ref_match(list_val, var_ref):
@@ -162,7 +168,7 @@ def _find_match_var(self, label: str, index: int) -> None:
             else:
                 for ref_i, ref_val in enumerate(var_ref):
                     for list_i, v in enumerate(list_val):
-                        if self._is_ref_match(v, ref_val):
+                        if self._is_ref_match(v, ref_val):                           
                             self._org_value[label][index][ref_i] = (
                                 self._org_value[key][i][list_i]
                             )
