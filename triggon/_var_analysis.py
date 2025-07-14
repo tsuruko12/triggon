@@ -310,9 +310,11 @@ def _ensure_safe_cond(self, expr: str) -> None | bool:
 
    allowed = (
         ast.Expression,
-        ast.Compare, ast.Name, ast.Attribute, ast.Constant, ast.Load,
-        ast.Eq, ast.NotEq, ast.Lt, ast.Gt, ast.LtE, ast.GtE,
-        ast.BoolOp, ast.And, ast.Or, ast.UnaryOp, ast.Not,
+        ast.Compare, ast.Name, ast.Attribute, ast.Constant, 
+        ast.Is, ast.IsNot, ast.In, ast.NotIn,
+        ast.Load, ast.Eq, ast.NotEq, ast.Lt, 
+        ast.Gt, ast.LtE, ast.GtE, ast.BoolOp, 
+        ast.And, ast.Or, ast.UnaryOp, ast.Not,
    )
 
    try:
