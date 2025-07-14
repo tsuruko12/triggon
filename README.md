@@ -29,9 +29,11 @@ Dynamically switch multiple values at specific trigger points.
 - Automatically jump to other functions at a trigger point.
 
 ## Upcoming Features
-- Support multiple indexed values for a single variable using `alter_var()`.
+- Support multiple indexed values for a single variable using `alter_var()` (will be renamed to `switch_var()`).
 - Support returning a value when `trigger_return()` is called with the ret keyword argument.
+- Support multiple labels in `alter_literal()` (will be renamed to `switch_lit()`).
 - Add `cond` option for conditional activation using expressions (e.g., x == 5) in `set_trigger()`.
+- Add `all` option to revert all labels in `revert()`.
 
 #### `alter_var()` example (planned)
 
@@ -90,6 +92,32 @@ def example(num: int):
 
 example(10) # Output: False
 example(0)  # Output: True
+```
+
+### `alter_literal()` and `revert()` example (planned)
+```python
+tg = Triggon({
+    "X": 20,
+    "Y": 10,
+    "Zero": 0,
+})
+
+def sample(flag: bool=None):
+    tg.set_trigger(["X", "Y"], cond="flag")
+    tg.set_trigger("Zero", cond="flag is None")
+
+    # Change the value if either label's flag is True.
+    # If both are True, the most recently triggered label takes priority.
+    x = tg.alter_literal(["X", "Zero"], org=10)
+    y = tg.alter_literal(["Y", "Zero"], org=20)
+
+    print(f"x is {x}, y is {y}.")
+
+    tg.revert(all=True) # Revert all labels
+
+sample(True)  # Output: x is 20, y is 10.
+sample(False) # Output: x is 10, y is 20.
+sample()      # Output: x is 0, y is 0.
 ```
 
 ## Installation
