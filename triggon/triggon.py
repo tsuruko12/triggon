@@ -143,7 +143,8 @@ class Triggon:
       self._clear_frame()
 
     def switch_lit(
-        self, label: str, /, org: Any, *, index: int=None,
+        self, label: str | list[str] | tuple[str, ...], /, org: Any, 
+        *, index: int=None,
     ) -> Any:
       """
       Changes the value at the specified label and position 
@@ -152,6 +153,30 @@ class Triggon:
       Only accepts immediate values
       (e.g., literals or expressions).
       """
+
+      cur_functions = ["switch_lit", "alter_literal"] # Will change it after beta
+
+      if isinstance(label, dict):
+        raise InvalidArgumentError(LABEL_TYPE_ERROR)
+      elif isinstance(label, (list, tuple)):
+        stripped_labels = []
+
+        for v in label:
+          stripped_v = v.lstrip(SYMBOL)       
+          stripped_labels.append(stripped_v) 
+
+        for key, val in self._trigger_flag.items():
+          if val and key in stripped_labels:
+            seq_index = stripped_labels.index(key)
+            label = label[seq_index]
+
+        if not isinstance(label, str):
+          if self.debug:
+            self._get_target_frame(cur_functions) # Will change it after beta
+            self._print_val_debug(name, index, flag, org)
+            self._clear_frame()
+
+          return org
 
       _check_label_type(label)
       
@@ -165,15 +190,19 @@ class Triggon:
       self._org_value[name][index] = org
       flag = self._trigger_flag[name]
 
+      if not flag:
+        ret_value = self._org_value[name][index]
+        new_val = None # for debug
+      else:
+        ret_value = self._new_value[name][index] 
+        new_val = self._new_value[name][index] # for debug
+
       if self.debug:
-        self._get_target_frame(["switch_lit", "alter_literal"]) # Will change it after beta
-        self._print_val_debug(name, index, flag, org)
+        self._get_target_frame(cur_functions) # Will change it after beta
+        self._print_val_debug(name, index, flag, org, new_val)
         self._clear_frame()
 
-      if not flag:
-        return self._org_value[name][index]
-
-      return self._new_value[name][index]  
+      return ret_value
 
     def switch_var(
           self, label: str | dict[str, Any], var: Any=None, /, 
@@ -310,15 +339,21 @@ class Triggon:
           self._clear_frame()
 
     def revert(
-          self, label: str | list[str] | tuple[str, ...], /, 
-          *, disable: bool=False,
+          self, label: str | list[str] | tuple[str, ...]=None, /, 
+          *, all: bool=False, disable: bool=False,
     ) -> None:
       """
       Revert the trigger flag of the specified label to False.
       If `disable` is set to True, the label will be permanently disabled.
       """
 
-      if isinstance(label, (list, tuple)):
+      if label is None:
+        if not all:
+          raise InvalidArgumentError("No labels specified to revert.")
+
+        for key in self._new_value.keys():
+          self._revert_label(key, disable)         
+      elif isinstance(label, (list, tuple)):
         for name in label:
           if not isinstance(name, str):
             raise InvalidArgumentError(LABEL_TYPE_ERROR)
