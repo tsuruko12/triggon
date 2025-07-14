@@ -75,8 +75,10 @@ def _check_label_flag(self, label: str, cond: str | None) -> None:
     if cond is not None:
         self._get_target_frame("set_trigger")
 
-        if self._ensure_safe_cond(cond):
-            self._trigger_flag[name] = True
+        if not self._ensure_safe_cond(cond):
+            return
+        
+        self._trigger_flag[name] = True
     else:
         self._trigger_flag[name] = True
     
@@ -146,12 +148,18 @@ def _find_match_var(self, label: str, index: int) -> None:
 
     # var_ref is a list or tuple
     var_ref = self._var_list[label][index]
+    stop_flag = False
 
     # `value` is a list
     for key, value in self._var_list.items(): 
         # `list_val` is a list or tuple or None
         for i, list_val in enumerate(value):
-            if list_val is None:
+            if stop_flag:
+                break
+
+            if key == label:
+                stop_flag = True
+            elif list_val is None:
                 continue
             elif isinstance(list_val, tuple) and isinstance(var_ref, tuple):
                 if self._is_ref_match(list_val, var_ref):
@@ -171,7 +179,7 @@ def _find_match_var(self, label: str, index: int) -> None:
             else:
                 for ref_i, ref_val in enumerate(var_ref):
                     for list_i, v in enumerate(list_val):
-                        if self._is_ref_match(v, ref_val):
+                        if self._is_ref_match(v, ref_val):                           
                             self._org_value[label][index][ref_i] = (
                                 self._org_value[key][i][list_i]
                             )
