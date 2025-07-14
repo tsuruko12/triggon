@@ -69,8 +69,10 @@ def _check_label_flag(self, label: str, cond: str | None) -> None:
     if cond is not None:
         self._get_target_frame("set_trigger")
 
-        if self._ensure_safe_cond(cond):
-            self._trigger_flag[name] = True
+        if not self._ensure_safe_cond(cond):
+            return
+        
+        self._trigger_flag[name] = True
     else:
         self._trigger_flag[name] = True
     
