@@ -166,7 +166,7 @@ class Triggon:
       flag = self._trigger_flag[name]
 
       if self.debug:
-        self._get_target_frame("alter_literal")
+        self._get_target_frame(["switch_lit", "alter_literal"]) # Will change it after beta
         self._print_val_debug(name, index, flag, org)
         self._clear_frame()
 
@@ -190,6 +190,8 @@ class Triggon:
         - Class attributes (fields)
         """
 
+        cur_functions = ["switch_var", "alter_var"] # Will change it after beta
+
         (change_list, arg_type) = _handle_arg_types(label, var, index, True)
         init_flag = False
 
@@ -209,7 +211,7 @@ class Triggon:
             self._var_list[name][index] is None 
             or self._is_new_var(name, index, var)
           ):
-            self._get_target_frame(["switch_var", "alter_var"]) # Change later
+            self._get_target_frame(cur_functions)
             self._lineno = self._frame.f_lineno     
 
             self._store_org_value(name, index, change_list[label])
@@ -227,7 +229,7 @@ class Triggon:
 
           if not trig_flag:
             if self.debug:
-              self._get_target_frame(["switch_var", "alter_var"]) # Change later
+              self._get_target_frame(cur_functions)
 
               self._print_var_debug(
                 vars, name, index, trig_flag, change_list[label],
@@ -263,6 +265,9 @@ class Triggon:
             name = key.lstrip(SYMBOL)
             index = _count_symbol(key)
 
+            self._check_exist_label(name)
+            _compare_value_counts(self._new_value[name], index)
+
             if self._org_value[name][index] is None:
               self._store_org_value(name, index, val)
 
@@ -271,7 +276,7 @@ class Triggon:
                and (self._var_list[name][index] is None 
                or self._is_new_var(name, index, val))
             ):    
-              self._get_target_frame("alter_var")
+              self._get_target_frame(cur_functions)
               self._lineno = self._frame.f_lineno
 
               # Initial process to store argument variables
@@ -288,7 +293,7 @@ class Triggon:
 
             if not trig_flag:
               if self.debug:
-                self._get_target_frame("alter_var")
+                self._get_target_frame(cur_functions) 
                 self._print_var_debug(vars, name, index, trig_flag, val)
 
               continue          
@@ -296,8 +301,7 @@ class Triggon:
             self._update_var_value(vars, self._new_value[name][index])
 
             if self.debug:
-              self._get_target_frame("alter_var")
-
+              self._get_target_frame(cur_functions)
               self._print_var_debug(
                 vars, name, index, trig_flag, val, 
                 self._new_value[name][index], change=True,
