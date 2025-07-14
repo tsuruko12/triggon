@@ -142,13 +142,38 @@ class Triggon:
       self._clear_frame()
 
     def switch_lit(
-        self, label: str, /, org: Any, *, index: int=None,
+        self, label: str | list[str] | tuple[str, ...], /, org: Any, 
+        *, index: int=None,
     ) -> Any:
       """
       引数のラベルのフラグがTrueの場合、その値を変更します。
  
       変数以外の式やリテラルのみ対応しています。
       """
+
+      cur_functions = ["switch_lit", "alter_literal"] # ベータ後に変更予定
+
+      if isinstance(label, dict):
+        raise InvalidArgumentError(LABEL_TYPE_ERROR)
+      elif isinstance(label, (list, tuple)):
+        stripped_labels = []
+
+        for v in label:
+          stripped_v = v.lstrip(SYMBOL)       
+          stripped_labels.append(stripped_v) 
+
+        for key, val in self._trigger_flag.items():
+          if val and key in stripped_labels:
+            seq_index = stripped_labels.index(key)
+            label = label[seq_index]
+
+        if not isinstance(label, str):
+          if self.debug:
+            self._get_target_frame(cur_functions)
+            self._print_val_debug(name, index, flag, org)
+            self._clear_frame()
+
+          return org
 
       _check_label_type(label)
       
@@ -162,15 +187,19 @@ class Triggon:
       self._org_value[name][index] = org
       flag = self._trigger_flag[name]
 
+      if not flag:
+        ret_value = self._org_value[name][index]
+        new_val = None # デバッグ用
+      else:
+        ret_value = self._new_value[name][index] 
+        new_val = self._new_value[name][index] # デバッグ用
+
       if self.debug:
-        self._get_target_frame(["switch_lit", "alter_literal"]) # ベータ後に変更予定
-        self._print_val_debug(name, index, flag, org)
+        self._get_target_frame(cur_functions)
+        self._print_val_debug(name, index, flag, org, new_val)
         self._clear_frame()
 
-      if not flag:
-        return self._org_value[name][index]
-
-      return self._new_value[name][index]
+      return ret_value
 
     def switch_var(
           self, label: str | dict[str, Any], var: Any=None, /, 
@@ -307,15 +336,21 @@ class Triggon:
           self._clear_frame()
 
     def revert(
-          self, label: str | list[str] | tuple[str, ...], /, 
-          *, disable: bool=False,
+          self, label: str | list[str] | tuple[str, ...]=None, /, 
+          *, all: bool=False, disable: bool=False,
     ) -> None:
       """
       引数のラベルのフラグをFalseに設定します。
       'disable'がTrueに設定された場合、永続的にフラグをFalseにします。
       """
       
-      if isinstance(label, (list, tuple)):
+      if label is None:
+        if not all:
+          raise InvalidArgumentError("引数にラベルを設定してください。")
+
+        for key in self._new_value.keys():
+          self._revert_label(key, disable)         
+      elif isinstance(label, (list, tuple)):
         for name in label:
           if not isinstance(name, str):
             raise InvalidArgumentError(LABEL_TYPE_ERROR)
@@ -324,9 +359,9 @@ class Triggon:
       elif isinstance(label, str):
         self._revert_label(label, disable)
       else:
-        raise InvalidArgumentError(LABEL_TYPE_ERROR)  
+        raise InvalidArgumentError(LABEL_TYPE_ERROR)    
 
-　　　 self._clear_frame()  
+      self._clear_frame()   
 
 　  def _revert_label(self, label: str, disable: bool) -> None:
       name = label.lstrip(SYMBOL)
