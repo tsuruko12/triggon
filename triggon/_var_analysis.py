@@ -90,7 +90,13 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
           if arg_type == ast.Dict and isinstance(first_arg, ast.Dict):
             result = self._arg_is_dict(first_arg)
           else:
-             second_arg = node.args[1]
+             try:
+               second_arg = node.args[1]
+             except IndexError:
+                raise InvalidArgumentError(
+                   "引数に変数を設定してください。"
+                )
+                 
              _identify_arg(second_arg)
 
              if isinstance(first_arg, ast.Name):
