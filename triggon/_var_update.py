@@ -25,7 +25,7 @@ def _update_var_value(
     # またはリストにこれらが複数入っている
 
     if isinstance(var_ref, list):
-        # 複数の値の場合は、リストに入れられている
+        # 複数の値の場合は、リストに入っている
         for value in var_ref:
             if len(value) == 3:
                 cur_value = var_ref[2].__dict__[var_ref[1]]
