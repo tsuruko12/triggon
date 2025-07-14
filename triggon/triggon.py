@@ -163,7 +163,7 @@ class Triggon:
       flag = self._trigger_flag[name]
 
       if self.debug:
-        self._get_target_frame("alter_literal")
+        self._get_target_frame(["switch_lit", "alter_literal"]) # ベータ後に変更予定
         self._print_val_debug(name, index, flag, org)
         self._clear_frame()
 
@@ -187,6 +187,8 @@ class Triggon:
         - クラス変数
         """
 
+        cur_functions = ["switch_var", "alter_var"] # ベータ後に変更予定
+
         (change_list, arg_type) = _handle_arg_types(label, var, index, True)
         init_flag = False
 
@@ -206,13 +208,14 @@ class Triggon:
             self._var_list[name][index] is None 
             or self._is_new_var(name, index, var)
           ):
-            self._store_org_value(name, index, change_list[label])
- 
-            self._get_target_frame("alter_var")
+            self._get_target_frame(cur_functions)
             self._lineno = self._frame.f_lineno     
+
+            self._store_org_value(name, index, change_list[label])   
 
             # 変数保存の初回処理
             self._init_arg_list(change_list, arg_type, index)
+            
             init_flag = True
 
           if init_flag:
@@ -223,7 +226,7 @@ class Triggon:
 
           if not trig_flag:
             if self.debug:
-              self._get_target_frame("alter_var")
+              self._get_target_frame(cur_functions)
 
               self._print_var_debug(
                 vars, name, index, trig_flag, change_list[label],
@@ -258,21 +261,24 @@ class Triggon:
             name = key.lstrip(SYMBOL)
             index = _count_symbol(key)
 
+            self._check_exist_label(name)
+            _compare_value_counts(self._new_value[name], index)
+
             if self._org_value[name][index] is None:
               self._store_org_value(name, index, val)
 
             if (
-              not init_flag
-              and (self._var_list[name][index] is None 
-              or self._is_new_var(name, index, val))
+               not init_flag
+               and (self._var_list[name][index] is None 
+               or self._is_new_var(name, index, val))
             ):    
-              self._get_target_frame("alter_var")
+              self._get_target_frame(cur_functions)
               self._lineno = self._frame.f_lineno
 
                # 変数保存の初回処理
               self._init_arg_list(change_list, arg_type)
               self._find_match_var(name, index)
-                
+
               init_flag = True
             
             if not init_flag:
@@ -283,7 +289,7 @@ class Triggon:
 
             if not trig_flag:
               if self.debug:
-                self._get_target_frame("alter_var")
+                self._get_target_frame(cur_functions)
                 self._print_var_debug(vars, name, index, trig_flag, val)
 
               continue          
@@ -291,14 +297,14 @@ class Triggon:
             self._update_var_value(vars, self._new_value[name][index])
 
             if self.debug:
-              self._get_target_frame("alter_var")
-                
+              self._get_target_frame(cur_functions)
+
               self._print_var_debug(
                 vars, name, index, trig_flag, val, 
                 self._new_value[name][index], change=True,
               )
             
-        self._clear_frame()
+          self._clear_frame()
 
     def revert(
           self, label: str | list[str] | tuple[str, ...], /, 
