@@ -28,6 +28,9 @@ Dynamically switch multiple values at specific trigger points.
 - Trigger early returns with optional return values.
 - Automatically jump to other functions at a trigger point.
 
+## Planned Feature
+- Support switching beyond values and function calls—toward broader code behavior control.
+
 ## Installation
 ```bash
 pip install triggon
