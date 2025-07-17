@@ -20,7 +20,7 @@ All notable changes to this project will be documented in this file.
 - Cleaned up code across multiple files
 
 ## ⚠️ Known issues
-- Using a tuple as a value may raise an error. A fix is on the way.
+- Using a tuple as a value may raise an error.
 - `switch_var()` may cause unexpected behavior in specific cases.
 - In debug mode, using `switch_var()` may cause unexpected behavior under specific conditions.
 
