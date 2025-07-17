@@ -207,9 +207,9 @@ However, **only comparison expressions (e.g., `x > 0 > y`, `value == 10`) are al
 Non-comparison expressions will raise an `InvalidArgumentError`.
 
 ### switch_lit (alter_literal)
-`def alter_literal(self, label: str | list[str] | tuple[str, ...], /, org: Any, *, index: int=None) -> Any`
+`def switch_lit(self, label: str | list[str] | tuple[str, ...], /, org: Any, *, index: int=None) -> Any`
 
-Changes a literal value when the flag is set to `True`.  
+Changes a literal value when the flag is active.  
 You can also use this function directly inside a print().  
 When using a dictionary for `label`, the `index` keyword cannot be used.
 
@@ -267,7 +267,7 @@ When multiple labels are passed and multiple flags are active,
 the earliest label in the sequence takes precedence.
 
 ### switch_var (alter_var)
-`def alter_var(self, label: str | dict[str, Any], var: Any=None, /, *, index: int=None) -> None | Any`
+`def switch_var(self, label: str | dict[str, Any], var: Any=None, /, *, index: int=None) -> None | Any`
 
 Changes variable value(s) directly when the flag is active.  
 **It supports global variables and class attributes, but not local variables.**

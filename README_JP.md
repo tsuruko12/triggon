@@ -204,9 +204,9 @@ sample(True)  # Output: 呼びましたか？
 それ以外の式が指定された場合は`InvalidArgumentError`が発生します。
 
 ### switch_lit (alter_literal)
-`def alter_literal(self, label: str | list[str] | tuple[str, ...], /, org: Any, *, index: int=None) -> Any`
+`def switch_lit(self, label: str | list[str] | tuple[str, ...], /, org: Any, *, index: int=None) -> Any`
 
-フラグが `True` に設定されているときに、リテラル値を変更します。    
+ラベルのフラグが有効の場合、リテラル値を変更します。    
 この関数は `print()` の中で直接使うこともできます。  　  
 `label` に辞書を使う場合、`index` キーワードは使用できません。
 
@@ -262,7 +262,7 @@ example()
 配列内でインデックスの早いラベルが優先されます。
 
 ### switch_var (alter_var)
-`def alter_var(self, label: str | dict[str, Any], var: Any=None, /, *, index: int=None) -> None | Any`
+`def switch_var(self, label: str | dict[str, Any], var: Any=None, /, *, index: int=None) -> None | Any`
 
 トリガーが有効な場合、変数の値を直接変更します。  
 **対応しているのはグローバル変数とクラス属性で、ローカル変数には対応していません。**
