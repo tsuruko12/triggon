@@ -22,6 +22,7 @@ All notable changes to this project will be documented in this file.
 ## ⚠️ Known issues
 - Using a tuple as a value may raise an error. A fix is on the way.
 - `switch_var()` may cause unexpected behavior in specific cases.
+- In debug mode, using `switch_var()` may cause unexpected behavior under specific conditions.
 
 ## [0.1.0b2] - 2025-07-09
 ### Added
