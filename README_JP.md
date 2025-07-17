@@ -12,7 +12,7 @@
 > バグが存在する可能性や、将来的にAPIが変更される可能性があります。**
 
 > ⚠️ 次回のアップデートで、`alter_var()`および`alter_literal()`の関数名は、  
-> それぞれ `switch_var()` および `switch_lit()` に変更されます。  
+> それぞれ `switch_var()` および `switch_lit()` に変更されました。  
 > ベータ期間中は互換性のため、従来の関数名も引き続き使用可能です。
 
 ## 目次
@@ -27,96 +27,6 @@
 - リテラル値・変数の両方を切り替え可能
 - 任意の戻り値付きで早期リターンが可能
 - トリガー時に他の関数へ自動ジャンプ可能
-
-## 追加予定の機能
-- `alter_var()` (新関数名: `switch_var()`) で、1つの変数に対して複数のインデックスの値に変更することができるようにします。
-- `trigger_return()`のキーワード引数で、戻り値を設定できるようにします。
-- `alter_literal()` (新関数名: `switch_lit()`)で、複数のラベルを設定できるようにします。
-- `set_trigger()` に式（例：x == 5）を使った条件付きの発動ができる `cond` オプションを追加
-- `revert()`に全てのラベルを一括で指定できる`all`オプションを追加
-
-### 🔧 `alter_var()`の例（実装予定）
-```python
-tg = Triggon("A", (1, 2, 3))
-
-a = 0
-tg.set_trigger("A")
-
-tg.alter_var("A", a)           # index 0 の値に切り替え
-print(a)  # 出力: 1
-
-tg.alter_var("A", a, index=1)  # index 1 の値に切り替え
-print(a)  # 出力: 2
-
-tg.alter_var("A", a, index=2)  # index 2 の値に切り替え
-print(a)  # 出力: 3
-```
-### 🔧 `trigger_return()`の例（実装予定）
-```python
-tg = Triggon({
-    "call": None,   
-    "return": 100,
-})
-
-F = TrigFunc() 
-
-def func_a(num: int) -> int:
-    x = tg.trigger_func("call", F.func_b(num))
-
-    # `ret`キーワードが設定されてる場合、初期設定の変更値より優先されます
-    tg.trigger_return("return", ret=x) 
-
-    return num
-
-def func_b(num: int) -> int:
-    return -num
-
-tg.set_trigger(["call", "return"]) 
-
-result = tg.exit_point("return", F.func_a(10))
-print(result) # 出力: -10
-```
-
-### 🔧 `set_trigger()`の例（実装予定）
-```python
-tg = Triggon("A", True)
-
-def example(num: int):
-    # "num == 0" が Trueの場合のみ、トリガーが発動する
-    tg.set_trigger("A", cond="num == 0") 
-
-    flag = tg.alter_literal("A", False)
-    print(flag)
-
-example(10) # 出力: False
-example(0)  # 出力: True
-```
-
-### 🔧 `alter_literal()` & `revert()`の例（実装予定）
-```python
-tg = Triggon({
-    "X": 20,
-    "Y": 10,
-    "Zero": 0,
-})
-
-def sample(flag: bool=None):
-    tg.set_trigger(["X", "Y"], cond="flag")
-    tg.set_trigger("Zero", cond="flag is None")
-
-    # どちらかのラベルのトリガーがTrueの場合に、その変更値に変わります。
-    # 両方Trueに場合は、最後のトリガーの方を優先します。
-    x = tg.alter_literal(["X", "Zero"], org=10)
-    y = tg.alter_literal(["Y", "Zero"], org=20)
-
-    print(f"xの値: {x}, yの値: {y}")
-
-    tg.revert(all=True) # 全てのラベルのフラグをFalseにする
-
-sample(True)  # 出力: xの値: 20, yの値: 10
-sample(False) # 出力: xの値: 10, yの値: 20
-sample()      # 出力: xの値: 0, yの値: 0
-```
 
 ## インストール方法
 ```bash
@@ -209,7 +119,7 @@ class ModeFlags:
 
 s = ModeFlags()
 
-s.set_mode(False)
+s.set_mode(Fa式se)
 # == 出力 ==
 # mode_a is False
 # mode_b is False
@@ -228,11 +138,13 @@ s.set_mode(True)
 `*` プレフィックス付きのラベルは初期化時には使用できず、`InvalidArgumentError` が発生します。　
 
 ### set_trigger
-`def set_trigger(self, label: str | list[str] | tuple[str, ...], /) -> None`
+`def set_trigger(self, label: str | list[str] | tuple[str, ...], /, *, cond: str=None) -> None`
 
 指定したラベルにトリガーを設定し、次回の呼び出しで値が更新されるようにします。  
 インデックスに関係なく、そのラベルに関連付けられたすべての値が変更されます。  
 `label` 引数には、文字列またはラベル名のリスト／タプルを渡すことができます。 
+
+キーワード引数 `cond` には比較式による条件を設定できますが、`if` などの制御構文は使用できません。
 
 なお、`revert()` を使って無効化されたラベルに対しては、フラグは変更されません。
 
@@ -270,8 +182,29 @@ example()
 # バナナ: 120円
 ```
 
-### alter_literal
-`def alter_literal(self, label: str, /, org: Any, *, index: int=None) -> Any`
+
+```python
+tg = Triggon("msg", "呼びましたか？")
+F = TrigFunc()
+
+def sample(print_msg: bool):
+    # print_msgがTrueの場合に"msg"のフラグを有効にする
+    tg.set_trigger("msg", cond="print_msg")
+
+    # "msg"フラグが有効な場合、テキストを出力する
+    print(tg.switch_lit("msg", ""))
+
+sample(False) # Output:
+sample(True)  # Output: 呼びましたか？ 
+```
+
+> ⚠️ **Note:** 
+この関数では内部で`eval()`を使用しています。
+ただし、比較式（例: `x > 0 > y`, `value == 10`）のみが許可されており、
+それ以外の式が指定された場合は`InvalidArgumentError`が発生します。
+
+### switch_lit (alter_literal)
+`def alter_literal(self, label: str | list[str] | tuple[str, ...], /, org: Any, *, index: int=None) -> Any`
 
 フラグが `True` に設定されているときに、リテラル値を変更します。    
 この関数は `print()` の中で直接使うこともできます。  　  
@@ -302,6 +235,8 @@ example() # 出力: After
 両方が指定されている場合は、キーワード引数の方が優先されます。  
 接頭辞以外の場所で使われた `*` にインデックスとして認識されないので、無視されます。
 
+> **Note:**  複数のインデックスを扱う場合は、可読性のため`index`キーワードの使用を推奨します。
+
 ```python
 # インデックス 0 に 'A' を、インデックス 1 に 'B' を設定
 tg = Triggon("char", new=("A", "B"))
@@ -322,12 +257,14 @@ example()
 # B
 ```
 
-> **Note:**  複数のインデックスを扱う場合は、可読性のため`index`キーワードの使用を推奨します。
+> **Note:**   
+複数のラベルが渡され、その中で複数のフラグが有効になっていた場合は、  
+配列内でインデックスの早いラベルが優先されます。
 
-### alter_var
+### switch_var (alter_var)
 `def alter_var(self, label: str | dict[str, Any], var: Any=None, /, *, index: int=None) -> None | Any`
 
-トリガーが `True` に設定されているとき、変数の値を直接変更します。  
+トリガーが有効な場合、変数の値を直接変更します。  
 **対応しているのはグローバル変数とクラス属性で、ローカル変数には対応していません。**
 
 複数のラベルと変数を辞書形式で渡すこともできます。  
@@ -338,7 +275,8 @@ example()
 **単一のラベルで渡された場合のみ、引数の値を返します。**  
 辞書型で渡された場合は`None`を返します。
 
-もしインデックスが大きくなる場合は、
+> **Note:**  
+もしインデックスが大きくなる場合は、  
 個別に関数を呼び出し、`index` キーワードを使って指定することを推奨します。
 
 ```python
@@ -406,24 +344,53 @@ print(f"a: {exm.a}, b: {exm.b}, c: {exm.c}")
 # 出力: a: 0, b: 2, c: 4
 ```
 
+また、１つの変数に対して複数の設定値に切り替えることも可能です。
+
+```python
+tg = Triggon({
+    "flag": [True, False],
+    "num": [0, 100],
+})
+
+@dataclass
+class Sample:
+    flag: bool = None
+    num: int = None
+
+    def sample(self, label: str, label_2: str):
+        tg.switch_var({label: self.flag, label_2: self.num})
+
+        print(f"flag: {self.flag}, num: {self.num}")
+
+s = Sample()
+tg.set_trigger(["flag", "num"])
+
+s.sample("flag", "num")   # 出力: flag: True, num: 0
+s.sample("*flag", "*num") # 出力: flag: False, num: 100
+```
+
 > **Note:**
 値の更新は基本的に `set_trigger()` が呼ばれたときに行われます。  
-ただし初回のみ、`alter_var()` によって対象変数が登録されていない限り、値は変化しません。  
-その場合、値の変更は `alter_var()` で行われます。  
+ただし初回のみ、`switch_var()` によって対象変数が登録されていない限り、値は変化しません。  
+その場合、値の変更は `switch_var()` で行われます。  
 一度登録されれば、その後の `set_trigger()` 呼び出しで即座に値が更新されます。　
 
 `index`キーワードには、整数リテラルのみが使用可能です。
 
 ### revert
-`def revert(self, label: str | list[str] | tuple[str, ...], /, *, disable: bool=False) -> None`
+`def revert(self, label: str | list[str] | tuple[str, ...]=None, /, *, all: bool=False, disable: bool=False) -> None`
 
-`alter_literal()` または `alter_var()` によって変更された値を、元の状態に戻します。  
+`switch_lit()` または `switch_var()` によって変更された値を、元の状態に戻します。  
+全てのラベルの値を一括で戻したい場合は、キーワード引数`all`を`True`に設定してください。
+
 この復元状態は、次に `set_trigger()` が呼び出されるまで有効です。  
 指定されたラベルに関連付けられたすべての値が、インデックスに関係なく元に戻されます。
 
 `disable` キーワードを `True` に設定すると、以降元の値が永続的に使用されます。
 
 ```python
+from dataclasses import dataclass
+
 from triggon import Triggon
 
 tg = Triggon("hi", new="こんにちは")
@@ -434,7 +401,8 @@ class User:
     init_done: bool = False
 
     def initialize(self):
-        tg.set_trigger("hi")  # 初回の挨拶用にトリガーをセット
+        # 初回の挨拶用にトリガーをセット
+        tg.set_trigger("hi")
         self.init_done = True
         self.greet()
 
@@ -456,29 +424,29 @@ user.entry()  # 出力: おかえりなさい, Guest!
 ```
 
 ```python
-tg = Triggon("A", "変更後の値")
+tg = Triggon({"name": "太郎", "state": True})
 
-x = "元の値"
-tg.alter_var("A", x)
+@dataclass
+class User:
+    name: str = None
+    online: bool = False
 
-def example():
-    print(x)
+    def login(self):
+        # 各ラベルに変数を設定
+        tg.switch_var({"name": self.name, "state": self.online})
+        tg.set_trigger(["name", "state"])
 
-    tg.set_trigger("A")
+user = User()
+print(f"User name: {user.name}\nOnline: {user.online}")
+# == Output ==
+# User name: None
+# Online: False
 
-    print(x)
-
-    tg.revert("A", disable=True)  # 永続的に元に戻す
-
-example()
-# == 出力 ==
-# 元の値
-# 変更後の値
-
-example()
-# == 出力 ==
-# 元の値
-# 元の値
+user.login()
+print(f"User name: {user.name}\nOnline: {user.online}")
+# == Output ==
+# User name: 太郎
+# Online: True
 ```
 
 ### exit_point
@@ -492,11 +460,14 @@ example()
 > **Note:** `trigger_return()`が実行されない場合は、この関数を使用する必要はありません。
 
 ### trigger_return
-`trigger_return(self, label: str, /, *, index: int=None, do_print: bool=False) -> None | Any`
+`trigger_return(self, label: str, /, ret: Any=None, *, index: int=None, do_print: bool=False) -> None | Any`
 
-フラグが `True` に設定されている場合に、早期リターンを発動させます。  
+フラグが有効な場合に、早期リターンを発動させます。  
 返す値は初期化時に設定しておく必要があります。  
 何も返す必要がない場合は、`None` を設定してください。
+
+`ret` に値を設定した場合、初期化時に設定された値は無視され、その値が返されます。  
+辞書型でない場合は、値を設定しなくても正常に動作します。
 
 キーワード引数 `do_print` を `True` にすると、リターン値を出力します。  
 ただし、値が文字列でない場合は `InvalidArgumentError` が発生します。
@@ -536,16 +507,40 @@ tg.exit_point("skip", F.check_funds(200))
 # （お金が不足しています...）
 ```
 
+```python
+tg = Triggon("zero")
+F = TrigFunc()
+
+def sample():
+    num = get_number()
+
+    # `num`が0の場合にラベル"zero"のフラグを有効にする
+    tg.set_trigger("zero", cond="num == 0")
+
+    # テキストを出力して早期リターン
+    tg.trigger_return("zero", ret=f"{num} ...", do_print=True) 
+
+    num_2 = get_number()
+
+    print(f"The total number is {num + num_2}!")
+
+def get_number():
+    return random.randint(0, 10) 
+
+tg.exit_point("zero", F.sample()) # The output is random!
+```
+
 ### trigger_func
 `def trigger_func(self, label: str, func: TrigFunc, /) -> None | Any`
 
-フラグが `True` に設定されている場合に、関数を呼び出します。  
+フラグが有効の場合に、関数を呼び出します。  
 `func` 引数には、対象の関数をラップした `TrigFunc` インスタンスを渡す必要があります。
 
-このラベルは、`Triggon` の初期化時に `None` で登録されていなければなりません。  
-* プレフィックスをつけたインデックスも使用できますが、無視されます。
+ラベルは初期設定時に登録しておく必要がありますが、設定した値が返されることはないため、どんな値でも正常に動作します。  
+また、辞書型を使用しない場合は、値を設定する必要はありません。  
+**対象の関数が値を返す場合は、その値が返されます。**
 
-対象関数が値を返す場合、その値も返されます。
+ラベルに `*` プレフィックスをつけたインデックスも使用できますが、無視されます。
 
 ```python
 from triggon import Triggon, TrigFunc
@@ -586,6 +581,9 @@ tg.exit_point("skip", F.example())
 ### エラー
 - `InvalidArgumentError`  
 引数の数、型、または使い方に誤りがある場合に発生します。
+
+- `MissingLabelError`
+設定されたラベルが登録されていない場合に発生します。
 
 ## ライセンス
 このプロジェクトは MIT ライセンスの下で公開されています。　
