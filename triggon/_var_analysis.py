@@ -3,17 +3,17 @@ import copy
 import linecache
 from itertools import count
 
-from ._exceptions import (
-    SYMBOL, 
-    InvalidArgumentError, 
-    _compare_value_counts,
-    _count_symbol, 
+from ._err_handler import (
+   _compare_value_counts, 
+   _count_symbol,
 )
+from ._exceptions import SYMBOL, InvalidArgumentError
+from ._switch_var import _is_mult_vars
 
 
 LABEL_ERROR = "ラベルは文字列で渡してください。"
-VALUE_TYPE_ERROR = "`value`には変数を入れてください。"
 NEST_ERROR = "この関数では配列内でネストすることは出来ません。"
+VALUE_TYPE_ERROR = "`value`には変数を入れてください。"
 VAR_ERROR = "ローカル変数は対応していません。"
 
 
@@ -31,25 +31,29 @@ def _init_arg_list(
     # 変数を照合するためのIDを保存
     for key, val in change_list.items():   
         name = key.lstrip(SYMBOL)
-        self._check_exist_label(name)
+        self._check_exist_label(name)   
 
         if not has_index:
           index = _count_symbol(key)
         _compare_value_counts(self._new_value[name], index)
 
-        if isinstance(val, (list, tuple)):
+        if self._id_list[name][index] is None and _is_mult_vars(val):
             self._id_list[name][index] = []
-
-            for v in val:
-               if isinstance(v, (list, tuple, dict)):
-                  raise InvalidArgumentError(NEST_ERROR)                       
-               self._id_list[name][index].append(id(v))     
+            self._id_list[name][index].extend([id(v) for v in val])    
 
             continue
         elif isinstance(val, dict):
            raise InvalidArgumentError(VALUE_TYPE_ERROR)
+        
+        target_index = self._id_list[name][index]
 
-        self._id_list[name][index] = id(val)
+        if target_index is None:
+           self._id_list[name][index] = id(val)         
+        else:
+          if not isinstance(target_index, list):
+             self._id_list[name][index] = [target_index]
+             
+          self._id_list[name][index].append(id(val))
  
     file_name = self._frame.f_code.co_filename 
     self._trace_func_call(file_name, arg_type)
@@ -70,7 +74,7 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
       except SyntaxError:
         # インデントエラーや複数行に関数が渡ってる場合のエラーは無視する。
         continue
-
+      else:
         # 呼び出されたの関数を見つけるためにASTノードを巡回
         
         for node in ast.walk(line_range):
@@ -139,7 +143,7 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
              else:
                 index = _count_symbol(label)
 
-              name = label.lstrip(SYMBOL)  
+             name = label.lstrip(SYMBOL)  
           
              if (
                 arg_type == ast.List 
@@ -168,7 +172,7 @@ def _trace_func_call(self, file_name: str, arg_type: ast.AST) -> None:
     )   
   
 def _arg_is_dict(self, target: ast.Dict) -> int:
-    arg_list = _deduplicate_labels(target)
+    arg_list = self._deduplicate_labels(target)
   
     for key, val in arg_list.items():
       label = key.lstrip(SYMBOL)
@@ -205,7 +209,7 @@ def _arg_is_seq(
 
     if target_index is None:
       self._var_list[label][index] = []
-    elif not isinstance(target_index, list):
+    elif isinstance(target_index, tuple):
        # 値を追加するためリストに変換
        self._var_list[label][index] = [target_index]
 
@@ -226,39 +230,41 @@ def _arg_is_seq(
 def _arg_is_name(
       self, target: str, label: str, index: int, inner_index: int=None,
 ) -> int:
-    self._check_exist_label(label)
-    _compare_value_counts(self._new_value[label], index)
+   self._check_exist_label(label)   
+   _compare_value_counts(self._new_value[label], index)
 
-    target_id = self._get_list_id(label, index, inner_index)
-    if target_id is None:
-       return 1
+   target_id = self._get_list_id(label, index, inner_index)
+   if target_id is None:
+      return 1
+    
+   try:
+      self._frame.f_globals[target]
+   except KeyError:
+      raise InvalidArgumentError(VAR_ERROR)
 
-    try:
-       self._frame.f_globals[target]
-    except KeyError:
-       raise InvalidArgumentError(VAR_ERROR)
+   target_index = self._var_list[label][index]
 
-    target_index = self._var_list[label][index]
-    # (行番号, 変数名)
-    if isinstance(target_index, list):
+   # (行番号, 変数名)
+   if isinstance(target_index, list):
+      if self._find_match_var(target_ref=(self._lineno, target), init=True):
+         return 0
+      
       self._var_list[label][index].append((self._lineno, target))
-    elif target_index is not None:
-       if isinstance(target_index, list):
-          self._var_list[label][index] = [target_index]
+   elif target_index is not None:
+      if isinstance(target_index, tuple):
+         self._var_list[label][index] = [target_index]
 
-       self._var_list[label][index].append((self._lineno, target))
-    else:
-       self._var_list[label][index] = (self._lineno, target)
+      self._var_list[label][index].append((self._lineno, target))
+   else:
+      self._var_list[label][index] = (self._lineno, target)
 
-    return 0
-
-    return 0
+   return 0
 
 def _arg_is_attr(
       self, target: ast.Attribute, label: str, 
       index: int, inner_index: int=None,
 ) -> int:
-    self._check_exist_label(label)
+    self._check_exist_label(label)      
     _compare_value_counts(self._new_value[label], index)
 
     target_id = self._get_list_id(label, index, inner_index)
@@ -274,17 +280,20 @@ def _arg_is_attr(
     target_index = self._var_list[label][index]
 
     # (行番号, 属性名, クラスインスタンス)
-    if isinstance(target_index, list):
+    if target_index is not None:
+      if (
+         self._find_match_var(
+            target_ref=(self._lineno, target.attr, instance), init=True,
+         )
+      ):
+         return 0
+      
+      if isinstance(target_index, tuple):
+         self._var_list[label][index] = [target_index]
+
       self._var_list[label][index].append(
          (self._lineno, target.attr, instance)
       )
-    elif target_index is not None:
-       if not isinstance(target_index, list):
-         self._var_list[label][index] = [target_index]
-
-       self._var_list[label][index].append(
-          (self._lineno, target.attr, instance)
-       )
     else:
        self._var_list[label][index] = (self._lineno, target.attr, instance)
 
@@ -350,14 +359,37 @@ def _ensure_safe_cond(self, expr: str) -> None | bool:
    return eval(expr, scope)
 
 
-def _deduplicate_labels(target: ast.Dict) -> dict[str, ast.AST]:
+def _deduplicate_labels(self, target: ast.Dict) -> dict[str, ast.AST]:
     # 重複したラベルを排除する
     sorted_list = {}
 
     for key, val in zip(target.keys, target.values):
-      sorted_list[key.value] = val
+      if isinstance(key, ast.Constant):
+        sorted_list[key.value] = val
+      else:
+         label = self._try_search_label(key)
+
+         if label is None:
+            raise ValueError("ラベルが見つかりませんでした。")
+            
+         sorted_list[label] = val
 
     return sorted_list
+
+def _try_search_label(self, var: ast.Name | ast.Attribute) -> None | str:
+   if isinstance(var, ast.Attribute):
+      instance = self._frame.f_locals[var.value.id]
+      field = instance.__dict__[var.attr]
+      return field
+   
+   try:
+      label = self._frame.f_locals[var.id]
+   except KeyError:
+      label = self._frame.f_globals[var.id]
+   except AttributeError:
+      return
+
+   return label
 
 
 def _identify_arg(target: ast.AST) -> None:
