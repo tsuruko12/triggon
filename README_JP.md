@@ -52,8 +52,8 @@ from triggon import Triggon
 tg = Triggon("num", new=[100, 0])
 
 def example():
-    x = tg.alter_literal("num", 0)    # インデック 0
-    y = tg.alter_literal("*num", 100) # インデック 1
+    x = tg.switch_lit("num", 0)    # インデック 0
+    y = tg.switch_lit("*num", 100) # インデック 1
 
     print(f"{x} -> {y}")
 
@@ -76,8 +76,8 @@ tg = Triggon({
 })
 
 def example():
-    x = tg.alter_literal("seq1", 10) # インデック 0
-    y = tg.alter_literal("seq2", 10) # インデック 0
+    x = tg.switch_lit("seq1", 10) # インデック 0
+    y = tg.switch_lit("seq2", 10) # インデック 0
 
     print(f"seq1 の値: {x}")
     print(f"seq1 の値: {y}")
@@ -109,7 +109,7 @@ class ModeFlags:
         if enable:
             tg.set_trigger("mode")
 
-        tg.alter_var("mode", [self.mode_a, self.mode_b, self.mode_c]) # すべて同じインデックス0を共有
+        tg.switch_var("mode", [self.mode_a, self.mode_b, self.mode_c]) # すべて同じインデックス0を共有
 
         print(
             f"mode_a is {self.mode_a}\n"
@@ -158,11 +158,11 @@ tg = Triggon({
 })
 
 def example():
-    msg = tg.alter_literal("msg", org="本日は通常通りの営業です。")
+    msg = tg.switch_lit("msg", org="本日は通常通りの営業です。")
     print(msg)
 
-    milk = tg.alter_literal('milk', 200)
-    banana = tg.alter_literal('banana', 120)
+    milk = tg.switch_lit('milk', 200)
+    banana = tg.switch_lit('banana', 120)
 
     print(f"牛乳: {milk}円")
     print(f"バナナ: {banana}円")
@@ -216,11 +216,11 @@ from triggon import Triggon
 tg = Triggon("text", new="After") 
 
 def example():
-    text = tg.alter_literal("text", org="Before", index=0)
+    text = tg.switch_lit("text", org="Before", index=0)
     print(text)  
 
     # print内に直接書くこともできます:
-    # print(tg.alter_literal('text', 'Before'))
+    # print(tg.switch_lit('text', 'Before'))
 
     tg.set_trigger("text")
 
@@ -244,10 +244,10 @@ tg = Triggon("char", new=("A", "B"))
 def example():
     tg.set_trigger("char")
 
-    print(tg.alter_literal("char", 0))           # インデックス 0（'*'なし＝デフォルトでインデックス0）
-    print(tg.alter_literal("*char", 1))          # インデックス 1（'*'で指定）
-    print(tg.alter_literal("*char", 0, index=0)) # インデックス 0（'index'が'*'より優先）
-    print(tg.alter_literal("char", 1, index=1))  # インデックス 1（'index'で指定）
+    print(tg.switch_lit("char", 0))           # インデックス 0（'*'なし＝デフォルトでインデックス0）
+    print(tg.switch_lit("*char", 1))          # インデックス 1（'*'で指定）
+    print(tg.switch_lit("*char", 0, index=0)) # インデックス 0（'index'が'*'より優先）
+    print(tg.switch_lit("char", 1, index=1))  # インデックス 1（'index'で指定）
 
 example()
 # == 出力 ==
@@ -299,8 +299,8 @@ def spin_gacha():
 
     tg.set_trigger(result)
 
-    tg.alter_var(result, level)
-    tg.alter_var(result, attack, index=1)
+    tg.switch_var(result, level)
+    tg.switch_var(result, attack, index=1)
 
     # 出力はランダムに変わります。
     # 例: result = 'level_2'の場合
@@ -327,7 +327,7 @@ class Example:
         if change:
             tg.set_trigger("even")
 
-        tg.alter_var({
+        tg.switch_var({
             "even": self.a,   # インデックス 0
             "*even": self.b,  # インデックス 1
             "**even": self.c, # インデックス 2
@@ -407,7 +407,7 @@ class User:
         self.greet()
 
     def greet(self):
-        msg = tg.alter_literal("hi", org="おかえりなさい")
+        msg = tg.switch_lit("hi", org="おかえりなさい")
         print(f"{msg}, {self.name}!")
 
     def entry(self):
