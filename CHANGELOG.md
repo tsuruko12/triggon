@@ -3,7 +3,6 @@
 All notable changes to this project will be documented in this file.
 
 ---
-
 ## [0.1.0b3] - 2025-07-17
 ### Added
 - Alias `switch_lit()` for `alter_literal()` and `switch_var()` for `alter_var()`
