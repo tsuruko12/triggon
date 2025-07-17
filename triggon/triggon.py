@@ -1,20 +1,26 @@
 from types import FrameType
 from typing import Any
 
-from ._exceptions import (
-    _ExitEarly,
-    InvalidArgumentError,
-    _check_label_type,
-    _compare_value_counts,
-    _count_symbol,
-    _handle_arg_types,
-    LABEL_TYPE_ERROR,
-    SYMBOL,
-)
-from . import _debug
-from . import _var_analysis
-from . import _var_update
 from .trig_func import TrigFunc
+from ._internal import (
+  _debug,
+  _err_handler,
+  _var_analysis,
+  _var_update,
+  _switch_var,
+)
+from ._internal._err_handler import (
+  _check_label_type,
+  _compare_value_counts,
+  _count_symbol,
+  _handle_arg_types, 
+)
+from ._internal._exceptions import (
+  InvalidArgumentError,
+  MissingLabelError,
+  SYMBOL,
+  _ExitEarly,
+)
 
 
 class Triggon:
@@ -83,27 +89,21 @@ class Triggon:
             self._add_new_label(label, value)
 
     def _add_new_label(self, label: str, value: Any, /) -> None:
+      is_seq = False
+      
+      # `length` is guaranteed to be greater than 0
       if isinstance(value, (list, tuple)):
         length = len(value)
+        is_seq = True
       else:
         length = 1
 
-      if isinstance(value, list) and length > 1: 
-        self._new_value[label] = tuple(value)
-      elif isinstance(value, tuple) and length > 1:
-        self._new_value[label] = value
-      elif isinstance(value, list) and length == 1:
-        if isinstance(value[0], (list, tuple)):
-          self._new_value[label] = value
+      if is_seq: 
+        if length > 1:
+          self._new_value[label] = tuple(value)
         else:
-          self._new_value[label] = (value[0],)
-      elif isinstance(value, tuple) and length == 1:
-        if isinstance(value[0], (list, tuple)):
-          self._new_value[label] = value 
-        else:
-          self._new_value[label] = value
+          self._new_value[label] = tuple(value)
       else:
-        # Unwrapped single value
         self._new_value[label] = (value,)
         
       self._trigger_flag[label] = False
@@ -129,17 +129,16 @@ class Triggon:
       activated if the result is `True`.
       """
 
+      _check_label_type(label, allow_dict=False)
+
       if isinstance(label, (list, tuple)):
         for name in label:
-          if not isinstance(name, str):
-             raise InvalidArgumentError(LABEL_TYPE_ERROR)
+          _check_label_type(label, allow_dict=False)
           
           self._check_label_flag(name, cond)
       elif isinstance(label, str):
         self._check_label_flag(label, cond)
-      else:
-        raise InvalidArgumentError(LABEL_TYPE_ERROR)
-      
+        
       self._clear_frame()
 
     def switch_lit(
@@ -147,39 +146,45 @@ class Triggon:
         *, index: int=None,
     ) -> Any:
       """
-      Changes the value at the specified label and position 
+      Changes the value at the specified label(s) and position 
       if the flag is active.
 
       Only accepts immediate values
       (e.g., literals or expressions).
+
+      Note:
+        If multiple labels share the same name,  
+        all will be triggered together by `set_trigger()`, 
+        regardless of index.  
+        In such cases, the one with the smaller index in the sequence takes precedence.  
+        This also applies when different labels are active at once.
       """
 
       cur_functions = ["switch_lit", "alter_literal"] # Will change it after beta
 
-      if isinstance(label, dict):
-        raise InvalidArgumentError(LABEL_TYPE_ERROR)
-      elif isinstance(label, (list, tuple)):
-        stripped_labels = []
+      _check_label_type(label, allow_dict=False)
 
+      if isinstance(label, (list, tuple)):
         for v in label:
-          stripped_v = v.lstrip(SYMBOL)       
-          stripped_labels.append(stripped_v) 
+          stripped_label = v.lstrip(SYMBOL)
 
-        for key, val in self._trigger_flag.items():
-          if val and key in stripped_labels:
-            seq_index = stripped_labels.index(key)
-            label = label[seq_index]
+          try:
+            label_flag = self._trigger_flag[stripped_label]
+          except KeyError:
+              raise MissingLabelError(stripped_label)
+          
+          if label_flag:
+            label = v
+            break
 
+        # When no matching labels are found
         if not isinstance(label, str):
           if self.debug:
-            self._get_target_frame(cur_functions) # Will change it after beta
+            self._get_target_frame(cur_functions)
             self._print_val_debug(name, index, flag, org)
-            self._clear_frame()
 
           return org
 
-      _check_label_type(label)
-      
       name = label.lstrip(SYMBOL)
       self._check_exist_label(name)
 
@@ -198,9 +203,8 @@ class Triggon:
         new_val = self._new_value[name][index] # for debug
 
       if self.debug:
-        self._get_target_frame(cur_functions) # Will change it after beta
+        self._get_target_frame(cur_functions)
         self._print_val_debug(name, index, flag, org, new_val)
-        self._clear_frame()
 
       return ret_value
 
@@ -227,31 +231,18 @@ class Triggon:
         if len(change_list) == 1:
           # When only one label is provided
           label = next(iter(change_list))
-          _check_label_type(label)
+          name = label.lstrip(SYMBOL)     
 
-          name = label.lstrip(SYMBOL)
-          self._check_exist_label(name)
+          self._check_exist_label(name)   
 
           if index is None:
             index = _count_symbol(label)
-          _compare_value_counts(self._new_value[name], index)
+          _compare_value_counts(self._new_value[name], index)  
 
-          if (
-            self._var_list[name][index] is None 
-            or self._is_new_var(name, index, var)
-          ):
-            self._get_target_frame(cur_functions)
-            self._lineno = self._frame.f_lineno     
-
-            self._store_org_value(name, index, change_list[label])
-
-            # Initial process to store argument variables 
-            self._init_arg_list(change_list, arg_type, index)
-            
-            init_flag = True
-
-          if init_flag:
-            self._find_match_var(name, index)
+          if not init_flag:
+            init_flag = (
+              self._init_or_not(name, index, change_list, var, arg_type)
+            )
 
           trig_flag = self._trigger_flag[name]
           vars = self._var_list[name][index]
@@ -263,7 +254,6 @@ class Triggon:
               self._print_var_debug(
                 vars, name, index, trig_flag, change_list[label],
               )   
-            self._clear_frame()
 
             return var
           elif not init_flag:
@@ -273,10 +263,10 @@ class Triggon:
 
           if self.debug:
             self._print_var_debug(
-              vars, name, index, trig_flag, change_list[label], 
-              self._new_value[name][index], change=True,
+              vars, name, index, trig_flag, 
+              change_list[label], self._new_value[name][index], 
+              change=True,
             )
-          self._clear_frame()
 
           return var
         else:
@@ -289,30 +279,16 @@ class Triggon:
             )
           
           for key, val in change_list.items():
-            _check_label_type(key)
-            
             name = key.lstrip(SYMBOL)
             index = _count_symbol(key)
 
-            self._check_exist_label(name)
-            _compare_value_counts(self._new_value[name], index)
+            if not init_flag:
+              self._check_exist_label(name)
+              _compare_value_counts(self._new_value[name], index)
 
-            if self._org_value[name][index] is None:
-              self._store_org_value(name, index, val)
-
-            if (
-               not init_flag
-               and (self._var_list[name][index] is None 
-               or self._is_new_var(name, index, val))
-            ):    
-              self._get_target_frame(cur_functions)
-              self._lineno = self._frame.f_lineno
-
-              # Initial process to store argument variables
-              self._init_arg_list(change_list, arg_type)
-              self._find_match_var(name, index)
-
-              init_flag = True
+              init_flag = (
+                self._init_or_not(name, index, change_list, val, arg_type)
+              )
             
             if not init_flag:
               continue
@@ -322,18 +298,20 @@ class Triggon:
 
             if not trig_flag:
               if self.debug:
-                self._get_target_frame(cur_functions) 
-                self._print_var_debug(vars, name, index, trig_flag, val)
+                self._print_var_debug(
+                  vars, name, index, trig_flag, val, 
+                  fram_clear=False,
+                )
 
               continue          
 
             self._update_var_value(vars, self._new_value[name][index])
 
             if self.debug:
-              self._get_target_frame(cur_functions)
               self._print_var_debug(
-                vars, name, index, trig_flag, val, 
-                self._new_value[name][index], change=True,
+                vars, name, index, trig_flag, 
+                val, self._new_value[name][index], 
+                change=True, frame_clear=False,
               )
             
           self._clear_frame()
@@ -343,35 +321,36 @@ class Triggon:
           *, all: bool=False, disable: bool=False,
     ) -> None:
       """
-      Revert the trigger flag of the specified label to False.
-      If `disable` is set to True, the label will be permanently disabled.
+      Revert the trigger flag(s) set by `set_trigger()` back to False.
+
+      Use the `all` keyword to revert all labels at once. 
+      If `disable` is set to True, the label(s) will be permanently disabled.
       """
 
       if label is None:
         if not all:
           raise InvalidArgumentError("No labels specified to revert.")
-
+        
         for key in self._new_value.keys():
-          self._revert_label(key, disable)         
+          self._revert_label(key, disable)      
       elif isinstance(label, (list, tuple)):
         for name in label:
-          if not isinstance(name, str):
-            raise InvalidArgumentError(LABEL_TYPE_ERROR)
-          
           self._revert_label(name, disable)
-      elif isinstance(label, str):
-        self._revert_label(label, disable)
       else:
-        raise InvalidArgumentError(LABEL_TYPE_ERROR)    
+        self._revert_label(label, disable)  
 
       self._clear_frame()      
 
     def _revert_label(self, label: str, disable: bool) -> None:
+      _check_label_type(label, allow_dict=False)
+
       name = label.lstrip(SYMBOL)
       self._check_exist_label(name)
 
-      if not self._trigger_flag[name]:
+      if not disable and not self._trigger_flag[name]:
         return
+      elif disable and self._disable_label[name]:
+        return 
 
       if disable:
         state = "disable" # for debug
@@ -447,6 +426,8 @@ class Triggon:
           self._get_target_frame("trigger_return")
           self._print_trig_debug(name, "Return")
 
+        self._get_target_frame("exit_point", has_exit=True)
+
         raise _ExitEarly 
         
     def trigger_func(self, label: str, func: TrigFunc, /) -> None | Any:
@@ -465,22 +446,14 @@ class Triggon:
                     
             return func()
         
-
     # Old functions
     alter_literal = switch_lit
     alter_var = switch_var
 
 
-for name, func in vars(_var_analysis).items():
-    if callable(func):
-        setattr(Triggon, name, func)
+modules = [_debug, _err_handler, _var_analysis, _var_update, _switch_var]
 
-
-for name, func in vars(_debug).items():
-    if callable(func):
-        setattr(Triggon, name, func)
-
-
-for name, func in vars(_var_update).items():
-    if callable(func):
-        setattr(Triggon, name, func)
+for module in modules:
+  for name, func in vars(module).items():
+      if callable(func):
+          setattr(Triggon, name, func)
