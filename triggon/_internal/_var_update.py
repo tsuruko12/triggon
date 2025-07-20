@@ -2,70 +2,52 @@ import inspect
 from typing import Any
 
 from ._exceptions import (
+    _FrameAccessError,
     _UnsetExitError,
     SYMBOL,
 )
-from ._switch_var import _is_mult_vars
 
 
 def _store_org_value(self, label: str, index: int, org_value: Any) -> None:
     target_index = self._org_value[label][index] 
 
     if target_index is None:
-        self._org_value[label][index] = org_value
-        return
-    elif not isinstance(target_index, list):
-        self._org_value[label][index] = [target_index]
-    elif not _is_mult_vars(target_index):
-        self._org_value[label][index] = [target_index]
+        self._org_value[label][index] = []
 
-    if isinstance(org_value, (list, tuple)):
-      for v in org_value:
-          self._org_value[label][index].append(v)
-    else:
-      self._org_value[label][index].append(org_value)
+    self._org_value[label][index].append(org_value)
 
 def _update_var_value(
-    self, 
-    var_ref: tuple[Any] | list[tuple[Any]], update_value: Any,
+    self, var_ref: tuple[str, ...] | list[tuple[str, ...]], 
+    label: str, index: int, update_value: Any, to_org: bool=False,
 ) -> None:
     # var_ref can be:
-    # - (lineno, var_name) for globals
-    # - (lineno, attr_name, instance) for class attributes
+    # - (file name, lineno, var name) for globals
+    # - (file name, lineno, attr name, instance) for class attributes
     # - a list of either form
 
+    if to_org:
+        trig_flag = False
+    else:
+        trig_flag = True
+
     if isinstance(var_ref, list):
-        # When multiple variables are provided, a list is used
         for value in var_ref:
-            if len(value) == 3:
-                cur_value = var_ref[2].__dict__[var_ref[1]]
+            if value[0] != self._file_name or value[1] != self._lineno:
+                continue
 
-                if cur_value == update_value:
-                    continue
-
-                setattr(value[2], value[1], update_value)
+            if len(value) == 4:
+                setattr(value[3], value[2], update_value)
             else:
-                cur_value = self._frame.f_globals[value[1]]
-
-                if cur_value == update_value:
-                    continue 
-
-                self._frame.f_globals[value[1]] = update_value   
+                self._frame.f_globals[value[2]] = update_value   
     else:     
-        if len(var_ref) == 3:
-            cur_value = var_ref[2].__dict__[var_ref[1]]
+        if len(var_ref) == 4:     
+            setattr(var_ref[3], var_ref[2], update_value)
+        else:    
+            self._frame.f_globals[var_ref[2]] = update_value
 
-            if cur_value == update_value:
-                return
-            
-            setattr(var_ref[2], var_ref[1], update_value)
-        else:  
-            cur_value = self._frame.f_globals[var_ref[1]]
-            
-            if cur_value == update_value:
-                return
-            
-            self._frame.f_globals[var_ref[1]] = update_value
+    if self.debug:
+        self._print_var_debug(label, index, trig_flag, update_value)
+
 
 def _check_label_flag(self, label: str, cond: str | None) -> None:
     target_func = "set_trigger"
@@ -83,15 +65,15 @@ def _check_label_flag(self, label: str, cond: str | None) -> None:
             return
         
     self._trigger_flag[name] = True
-    
-    self._label_has_var(name, target_func, False)
 
     if self.debug:
         self._get_target_frame(target_func)
-        self._print_flag_debug(name, "active", clear_fram=False)
+        self._print_flag_debug(name, "active", clear=False)
+
+    self._label_has_var(name, target_func)
 
 def _label_has_var(
-    self, label: str, called_func: str, to_org: bool,
+    self, label: str, called_func: str, to_org: bool=False,
 ) -> None:
     if self._var_list[label] is None:
         return
@@ -99,6 +81,7 @@ def _label_has_var(
     if to_org:
         update_value = self._org_value[label]
     else:
+        # Each index always holds a single value.
         update_value = self._new_value[label]
 
     self._get_target_frame(called_func)
@@ -111,13 +94,24 @@ def _label_has_var(
             continue
         elif isinstance(var_ref, list):
             for i_2, val in enumerate(var_ref):
-                if not isinstance(update_value[i], (list, tuple)):
-                    self._update_var_value(val, update_value[i])
-                    continue            
-
-                self._update_var_value(val, update_value[i][i_2])
+                if to_org:
+                    self._update_var_value(
+                        val, label, i, update_value[i][i_2], to_org,
+                    )
+                elif not to_org:
+                    self._update_var_value(
+                        val, label, i, update_value[i], to_org,
+                    )
+                    break
         else:
-            self._update_var_value(var_ref, update_value[i])      
+            if to_org:
+                self._update_var_value(
+                    var_ref, label, i, update_value[i][0], to_org,
+                )
+            else:
+                self._update_var_value(
+                    var_ref, label, i, update_value[i], to_org,
+                )
 
 def _get_target_frame(
         self, target_name: str | list[str, str], has_exit: bool=False,
@@ -132,19 +126,35 @@ def _get_target_frame(
           if frame.f_code.co_name == "<module>":
               raise _UnsetExitError()
           elif frame.f_code.co_name == target_name:
-              return
+              break
       elif isinstance(target_name, list):
           if frame.f_code.co_name in target_name:
               self._frame = frame.f_back
-              return
+              break
       elif frame.f_code.co_name == target_name:
          self._frame = frame.f_back
-         return     
+         break 
       
       frame = frame.f_back
+
+   if has_exit:
+       return
+   elif self._frame is None:
+       raise _FrameAccessError()
+   
+   self._get_trace_info()
+
+def _get_trace_info(self) -> None:
+    if self._lineno is None:
+        self._lineno = self._frame.f_lineno
+
+    if self._file_name is None:
+        self._file_name = self._frame.f_code.co_filename
 
 def _clear_frame(self) -> None:
    # to prevent memory leak by releasing the frame reference
    self._frame = None
    self._lineno = None
+   self._file_name = None
+
 
