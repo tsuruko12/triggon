@@ -11,30 +11,34 @@ from ._internal import (
 )
 from ._internal._err_handler import (
   _check_label_type,
-  _compare_value_counts,
-  _count_symbol,
   _handle_arg_types, 
 )
 from ._internal._exceptions import (
   InvalidArgumentError,
-  MissingLabelError,
   SYMBOL,
   _ExitEarly,
 )
+from ._internal._sentinel import _no_value
 
 
 class Triggon:
     debug: bool
     _debug_var: dict[str, tuple[int, str] | list[tuple[int, str]]]
     _trigger_flag: dict[str, bool]
-    _new_value: dict[str, tuple[Any]]
-    _org_value: dict[str, tuple[Any]]
-    _var_list: dict[str, tuple[str]]
+    _new_value: dict[str, tuple[Any, ...]]
+    _org_value: dict[str, list[Any]]
+    _var_list: dict[str, tuple[str, ...] | list[tuple[str, ...]]]
     _disable_label: dict[str, bool]
-    _id_list: dict[str, int | tuple[int]]
-    _return_value: tuple[bool, Any] | None = None
-    _lineno: int = None
-    _frame: FrameType = None
+    _return_value: tuple[bool, Any] | None
+    _file_name: str
+    _lineno: int
+    _frame: FrameType
+
+    # `new_value`: Each label holds a tuple of values.
+    # `org_value`: Each label index holds a list of values,
+    #              or None if unset.
+    # `var_list`: Each label index holds a tuple of strings,
+    #             a list of such tuples, or None if unset.
 
     def __init__(
         self, label: str | dict[str, Any], /, new: Any=None, 
@@ -61,64 +65,55 @@ class Triggon:
       self._org_value = {}
       self._var_list = {}  
       self._disable_label = {}   
-      self._id_list = {}
+      self._return_value = None
+      self._file_name = None
+      self._lineno = None
+      self._frame = None
 
       change_list = _handle_arg_types(label, new)
       self._scan_dict(change_list)
 
     def _scan_dict(self, arg_dict: dict[str, Any]) -> None:      
       for key, value in arg_dict.items():          
-          label = key.lstrip(SYMBOL)
-          index = _count_symbol(key)
+          index = self._count_symbol(key)
 
           if index != 0:
               raise InvalidArgumentError(
-                  f"Please remove the '*' prefix from `{key}`. " 
+                  f"Please remove the `*` prefix from `{key}`. " 
                   "To specify by index, "
                   "provide the values in index order using a list or tuple."
               )
-
-          try:
-            self._new_value[label]
-
-            raise InvalidArgumentError(
-              f"`{label}` already exists." 
-              "Duplicate labels are not allowed for this function."
-            ) 
-          except KeyError:
-            self._add_new_label(label, value)
+          
+          self._add_new_label(key, value)
 
     def _add_new_label(self, label: str, value: Any, /) -> None:
-      is_seq = False
-      
-      # `length` is guaranteed to be greater than 0
+      # The value is normalized to a tuple
       if isinstance(value, (list, tuple)):
         length = len(value)
-        is_seq = True
-      else:
-        length = 1
 
-      if is_seq: 
-        if length > 1:
-          self._new_value[label] = tuple(value)
+        if length == 0:
+          # An empty sequence is handled as a single value
+          length = 1
+          self._new_value[label] = (value,)
         else:
           self._new_value[label] = tuple(value)
       else:
+        length = 1
         self._new_value[label] = (value,)
-        
+
       self._trigger_flag[label] = False
       self._disable_label[label] = False
 
-      # Create a list of None values—one for each index of this label
+      # Create a list of `None` values—one for each index of this label
+      # (`length` is greater than 0)
       self._org_value[label] = [None] * length
       self._var_list[label] = [None] * length
-      self._id_list[label] = [None] * length
 
     def set_trigger(
         self, label: str | list[str] | tuple[str, ...], /, *, cond: str=None,
     ) -> None:
       """
-      Activates the trigger flag for the given label(s).
+      Activates the trigger flag for the given labels.
 
       If variables were registered via `alter_var()`, 
       their values will be updated when the flag is activated.
@@ -129,14 +124,12 @@ class Triggon:
       activated if the result is `True`.
       """
 
-      _check_label_type(label, allow_dict=False)
-
       if isinstance(label, (list, tuple)):
         for name in label:
-          _check_label_type(label, allow_dict=False)
-          
+          _check_label_type(name, allow_dict=False)       
           self._check_label_flag(name, cond)
-      elif isinstance(label, str):
+      else:
+        _check_label_type(label, allow_dict=False)
         self._check_label_flag(label, cond)
         
       self._clear_frame()
@@ -167,17 +160,13 @@ class Triggon:
       if isinstance(label, (list, tuple)):
         for v in label:
           stripped_label = v.lstrip(SYMBOL)
+          self._check_exist_label(stripped_label)
 
-          try:
-            label_flag = self._trigger_flag[stripped_label]
-          except KeyError:
-              raise MissingLabelError(stripped_label)
-          
-          if label_flag:
+          if self._trigger_flag[stripped_label]:
             label = v
             break
 
-        # When no matching labels are found
+        # When all labels' triggers are inactive
         if not isinstance(label, str):
           if self.debug:
             self._get_target_frame(cur_functions)
@@ -189,15 +178,14 @@ class Triggon:
       self._check_exist_label(name)
 
       if index is None:
-        index = _count_symbol(label)
-      _compare_value_counts(self._new_value[name], index)
+        index = self._count_symbol(label)
+      self._compare_value_counts(name, index)
 
-      self._org_value[name][index] = org
       flag = self._trigger_flag[name]
 
       if not flag:
-        ret_value = self._org_value[name][index]
-        new_val = None # for debug
+        ret_value = org
+        new_val = _no_value # for debug
       else:
         ret_value = self._new_value[name][index] 
         new_val = self._new_value[name][index] # for debug
@@ -223,9 +211,7 @@ class Triggon:
         - Class attributes (fields)
         """
 
-        cur_functions = ["switch_var", "alter_var"] # Will change it after beta
-
-        (change_list, arg_type) = _handle_arg_types(label, var, index, True)
+        change_list = _handle_arg_types(label, var, index)
         init_flag = False
 
         if len(change_list) == 1:
@@ -233,40 +219,25 @@ class Triggon:
           label = next(iter(change_list))
           name = label.lstrip(SYMBOL)     
 
-          self._check_exist_label(name)   
-
           if index is None:
-            index = _count_symbol(label)
-          _compare_value_counts(self._new_value[name], index)  
+            index = self._count_symbol(label)
 
           if not init_flag:
-            init_flag = (
-              self._init_or_not(name, index, change_list, var, arg_type)
-            )
+            init_flag = (self._init_or_not(name, index))
 
           trig_flag = self._trigger_flag[name]
           vars = self._var_list[name][index]
 
           if not trig_flag:
-            if self.debug:
-              self._get_target_frame(cur_functions)
-
-              self._print_var_debug(
-                vars, name, index, trig_flag, change_list[label],
-              )   
-
+            self._clear_frame()
             return var
           elif not init_flag:
              return var
 
-          self._update_var_value(vars, self._new_value[name][index])  
-
-          if self.debug:
-            self._print_var_debug(
-              vars, name, index, trig_flag, 
-              change_list[label], self._new_value[name][index], 
-              change=True,
-            )
+          self._update_var_value(
+            vars, name, index, self._new_value[name][index],
+          )      
+          self._clear_frame()
 
           return var
         else:
@@ -275,20 +246,15 @@ class Triggon:
           if index is not None:
             raise InvalidArgumentError(
               "Cannot use the `index` keyword with a dictionary. " 
-              "Use '*' in the label instead." 
+              "Use `*` in the label instead." 
             )
           
-          for key, val in change_list.items():
+          for key in change_list.keys():
             name = key.lstrip(SYMBOL)
-            index = _count_symbol(key)
+            index = self._count_symbol(key)
 
             if not init_flag:
-              self._check_exist_label(name)
-              _compare_value_counts(self._new_value[name], index)
-
-              init_flag = (
-                self._init_or_not(name, index, change_list, val, arg_type)
-              )
+              init_flag = self._init_or_not(name, index)
             
             if not init_flag:
               continue
@@ -297,22 +263,11 @@ class Triggon:
             vars = self._var_list[name][index]  
 
             if not trig_flag:
-              if self.debug:
-                self._print_var_debug(
-                  vars, name, index, trig_flag, val, 
-                  fram_clear=False,
-                )
-
               continue          
 
-            self._update_var_value(vars, self._new_value[name][index])
-
-            if self.debug:
-              self._print_var_debug(
-                vars, name, index, trig_flag, 
-                val, self._new_value[name][index], 
-                change=True, frame_clear=False,
-              )
+            self._update_var_value(
+              vars, name, index, self._new_value[name][index],
+            )
             
           self._clear_frame()
 
@@ -359,7 +314,7 @@ class Triggon:
         state = "inactive" # for debug
       self._trigger_flag[name] = False
 
-      self._label_has_var(name, "revert", True)
+      self._label_has_var(name, "revert", to_org=True)
 
       if self.debug:
         self._get_target_frame("revert")
@@ -398,7 +353,7 @@ class Triggon:
         self._check_exist_label(name)
 
         if index is None:
-           index = _count_symbol(label)
+           index = self._count_symbol(label)
 
         if not self._trigger_flag[name]:
             return 
