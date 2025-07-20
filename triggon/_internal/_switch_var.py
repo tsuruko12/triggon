@@ -1,5 +1,3 @@
-from ._exceptions import SYMBOL
-
 def _init_or_not(self, label: str, index: int) -> bool:
     self._get_target_frame(["switch_var", "alter_var"]) # Will change it after beta 
 
