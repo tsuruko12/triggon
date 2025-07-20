@@ -109,8 +109,7 @@ class ModeFlags:
     mode_c: bool = False
 
     def set_mode(self, enable: bool):
-        if enable:
-            tg.set_trigger("mode")
+        tg.set_trigger("mode", cond="enable")
 
         tg.switch_var("mode", [self.mode_a, self.mode_b, self.mode_c]) # すべて同じインデックス0を共有
 
@@ -263,6 +262,7 @@ example()
 > **Note:**   
 複数のラベルが渡され、その中で複数のフラグが有効になっていた場合は、  
 配列内でインデックスの早いラベルが優先されます。
+`index`引数が指定されてた場合は、全てのラベルに適用されます。
 
 ### switch_var (alter_var)
 `def switch_var(self, label: str | dict[str, Any], var: Any=None, /, *, index: int=None) -> None | Any`
@@ -372,13 +372,14 @@ s.sample("flag", "num")   # 出力: flag: True, num: 0
 s.sample("*flag", "*num") # 出力: flag: False, num: 100
 ```
 
-> **Note:**
-値の更新は基本的に `set_trigger()` が呼ばれたときに行われます。  
-ただし初回のみ、`switch_var()` によって対象変数が登録されていない限り、値は変化しません。  
-その場合、値の変更は `switch_var()` で行われます。  
-一度登録されれば、その後の `set_trigger()` 呼び出しで即座に値が更新されます。　
-
-`index`キーワードには、整数リテラルのみが使用可能です。
+> **Notes:**
+> 値の更新は基本的に `set_trigger()` が呼ばれたときに行われます。  
+> ただし初回のみ、`switch_var()` によって対象変数が登録されていない限り、値は変化しません。  
+> その場合、値の変更は `switch_var()` で行われます。  
+> 一度登録されれば、その後の `set_trigger()` 呼び出しで即座に値が更新されます。　
+>
+> 一部の実行環境では、alter_var や switch_var の呼び出しを静的に検出できず、  
+> エラーになることがあります（例：Jupyter、REPLなど）。
 
 ### revert
 `def revert(self, label: str | list[str] | tuple[str, ...]=None, /, *, all: bool=False, disable: bool=False) -> None`
