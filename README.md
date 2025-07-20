@@ -109,8 +109,7 @@ class ModeFlags:
     mode_c: bool = False
 
     def set_mode(self, enable: bool):
-        if enable:
-            tg.set_trigger("mode")
+        tg.set_trigger("mode", cond="enable")
 
         tg.switch_var("mode", [self.mode_a, self.mode_b, self.mode_c]) # All values share index 0
 
@@ -268,6 +267,8 @@ example()
 > **Note:**   
 When multiple labels are passed and multiple flags are active,  
 the earliest label in the sequence takes precedence.
+In that case, if the `index` keyword is passed,  
+it will be applied to all labels.
 
 ### switch_var (alter_var)
 `def switch_var(self, label: str | dict[str, Any], var: Any=None, /, *, index: int=None) -> None | Any`
@@ -379,13 +380,14 @@ s.sample("*flag", "*num") # Output: flag is False and num is 100
 ```
 
 > **Notes:** 
-Values are typically updated when `set_trigger()` is called.  
-However, on the first call, 
-the value won't change unless the variable has been registered via `switch_var()`.  
-In that case, the value is changed by `switch_var()`.  
-Once registration is complete, each call to `set_trigger()` immediately updates the value.  
-
-The `index` keyword does not accept a variable — only integer literals are allowed.
+> Values are typically updated when `set_trigger()` is called.  
+> However, on the first call, 
+> the value won't change unless the variable has been registered via `switch_var()`.  
+> In that case, the value is changed by `switch_var()`.  
+> Once registration is complete, each call to `set_trigger()` immediately updates the value.  
+>
+> In some environments (e.g., Jupyter or REPL),  
+> calls to alter_var or switch_var may not be detected due to source code unavailability.
 
 ### revert
 `def revert(self, label: str | list[str] | tuple[str, ...]=None, /, *, all: bool=False, disable: bool=False) -> None`
