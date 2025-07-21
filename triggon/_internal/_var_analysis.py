@@ -91,6 +91,8 @@ def _trace_func_call(self) -> None:
                 result = self._arg_is_name(second_arg.id, name, index)
              elif isinstance(second_arg, ast.Attribute):
                 result = self._arg_is_attr(second_arg, name, index)
+             else:
+                raise InvalidArgumentError(VALUE_TYPE_ERROR)
 
         # It means that the target function was found at least once.
         if result:
@@ -263,22 +265,18 @@ def _try_search_value(self, var: ast.AST) -> int | str:
    elif isinstance(var, ast.Name):
       (_, value) = self._try_search_var(var)
    elif isinstance(var, ast.Attribute):
-      (var_name, _) = self._try_search_var(var)
+      (var_name, full_name) = self._try_search_var(var, get_full_name=True)
 
-      if var_name.count(".") > 1:
+      if full_name.count(".") > 1:
          # When it's an attribute chain
-         value = self._get_nested_value(value)
+         value = self._get_nested_value(full_name)
       else:
          instance = self._frame.f_locals[var_name]
          value = instance.__dict__[var.attr]
-   elif isinstance(var, ast.Call):
-      func_name = self._try_search_var(var.func, get_func=True)
-
-      compiled = compile(func_name, "<string>", "eval")
-      value = eval(compiled, self._frame.f_globals, self._frame.f_locals)
    else:
       raise InvalidArgumentError(
-         "Only simple values or functions are allowed as labels or index."
+         "Only literals, variables, or simple attribute access " 
+         "are allowed for labels or the index keyword in this function."
       )
    
    return value
