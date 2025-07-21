@@ -18,7 +18,8 @@ def _store_org_value(self, label: str, index: int, org_value: Any) -> None:
 
 def _update_var_value(
     self, var_ref: tuple[str, ...] | list[tuple[str, ...]], 
-    label: str, index: int, update_value: Any, to_org: bool=False,
+    label: str, index: int, update_value: Any, 
+    inner_index: int=None, to_org: bool=False,
 ) -> None:
     # var_ref can be:
     # - (file name, lineno, var name) for globals
@@ -29,24 +30,16 @@ def _update_var_value(
         trig_flag = False
     else:
         trig_flag = True
-
-    if isinstance(var_ref, list):
-        for value in var_ref:
-            if value[0] != self._file_name or value[1] != self._lineno:
-                continue
-
-            if len(value) == 4:
-                setattr(value[3], value[2], update_value)
-            else:
-                self._frame.f_globals[value[2]] = update_value   
-    else:     
-        if len(var_ref) == 4:     
-            setattr(var_ref[3], var_ref[2], update_value)
-        else:    
-            self._frame.f_globals[var_ref[2]] = update_value
+  
+    if len(var_ref) == 4:     
+        setattr(var_ref[3], var_ref[2], update_value)
+    else:    
+        self._frame.f_globals[var_ref[2]] = update_value
 
     if self.debug:
-        self._print_var_debug(label, index, trig_flag, update_value)
+        self._print_var_debug(
+            label, index, trig_flag, inner_index, update_value,
+        )
 
 
 def _check_label_flag(self, label: str, cond: str | None) -> None:
@@ -93,24 +86,24 @@ def _label_has_var(
         if var_ref is None:
             continue
         elif isinstance(var_ref, list):
-            for i_2, val in enumerate(var_ref):
-                if to_org:
+            if to_org:
+                for i_2, val in enumerate(update_value[i]):
                     self._update_var_value(
-                        val, label, i, update_value[i][i_2], to_org,
+                        var_ref[i_2], label, i, val, i_2, to_org,
                     )
-                elif not to_org:
+            else:
+                for i_2, val in enumerate(var_ref):
                     self._update_var_value(
-                        val, label, i, update_value[i], to_org,
-                    )
-                    break
+                        val, label, i, update_value[i], i_2, to_org,
+                    )             
         else:
             if to_org:
                 self._update_var_value(
-                    var_ref, label, i, update_value[i][0], to_org,
+                    var_ref, label, i, update_value[i][0], to_org=to_org,
                 )
             else:
                 self._update_var_value(
-                    var_ref, label, i, update_value[i], to_org,
+                    var_ref, label, i, update_value[i], to_org=to_org,
                 )
 
 def _get_target_frame(
