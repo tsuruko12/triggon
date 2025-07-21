@@ -2,6 +2,7 @@ def _init_or_not(self, label: str, index: int) -> bool:
     self._get_target_frame(["switch_var", "alter_var"]) # Will change it after beta 
 
     self._check_exist_label(label)  
+    self._compare_value_counts(label, index)
 
     if (
         self._var_list[label][index] is None 
@@ -41,19 +42,22 @@ def _is_new_var(
         
     return True
 
-def _find_match_var(
-        self, 
-        label: str=None, index: int=None, target_ref: tuple[str, ...]=None,
-) -> None:
+def _find_match_var(self, label: str=None, index: int=None) -> None:
     # Used to retrieve the original value for `revert()`
 
     # it can be a list or tuple
     var_ref = self._var_list[label][index]
 
+    # Searrch up to the same label
+    stop_flag = False
+
     # `value` is a list
     for key, value in self._var_list.items(): 
-        if key == label:
+        if stop_flag:
             return
+        
+        if key == label:
+            stop_flag = True
 
         # `list_val` is a list or tuple or None
         for i, list_val in enumerate(value):
@@ -62,7 +66,6 @@ def _find_match_var(
             elif isinstance(list_val, tuple) and isinstance(var_ref, tuple):
                 if self._is_ref_match(list_val, var_ref):
                     self._org_value[label][index] = self._org_value[key][i]     
-
             elif isinstance(list_val, tuple) and isinstance(var_ref, list):
                 for i_2, ref_v in enumerate(var_ref):
                     if self._is_ref_match(list_val, ref_v):
@@ -87,8 +90,7 @@ def _is_ref_match(
         self, list_val: tuple[str, ...], target_val: tuple[str, ...],
 ) -> bool:
     if len(list_val) == 3 and len(target_val) == 3:
-        return list_val[:2] == target_val[:2]
-
+        return list_val[0] == target_val[0] and list_val[2] == target_val[2]
     elif len(list_val) == 4 and len(target_val) == 4:
-        return list_val[:2] == target_val[:2]
+        return list_val[2:] == target_val[2:]
     
