@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [0.1.0b4] - 2025-07-22
+### Changed
+- Supported empty sequences or dictionaries as new values
+- Labels and the `index` keyword now support variables and attribute chains
+
+### Fixed
+- Fixed bugs related to `debug` mode usage
+- Fixed a bug that caused `IndexError` in certain cases
+
+### Refactored
+- Cleaned up code across multiple files
+
 ## [0.1.0b3] - 2025-07-17
 ### Added
 - Alias `switch_lit()` for `alter_literal()` and `switch_var()` for `alter_var()`
@@ -15,7 +27,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Bugs in variable registration function
 
-### Refactoring
+### Refactored
 - Cleaned up code across multiple files
 
 ## ⚠️ Known issues
