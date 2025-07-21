@@ -22,14 +22,17 @@ Dynamically switch multiple values at specific trigger points.
 - [Author](#author)
 
 ## Features
-- Switch multiple values at once with a single trigger point.
-- No `if` or `match` statements needed.
-- Switch both literal values and variables.
-- Trigger early returns with optional return values.
-- Automatically jump to other functions at a trigger point.
+- Switch multiple values at once with a single trigger point
+- No `if` or `match` statements needed
+- Switch both literal values and variables
+- Trigger early returns with optional return values
+- Automatically jump to other functions at a trigger point
 
 ## Planned Feature
-- Support switching beyond values and function calls—toward broader code behavior control.
+- Support switching beyond values and function calls—toward broader code behavior control
+
+## Upcoming Feature
+- Support for delayed trigger execution (e.g., after N seconds)
 
 ## Installation
 ```bash
@@ -190,7 +193,6 @@ example()
 
 ```python
 tg = Triggon("msg", "Call me?")
-F = TrigFunc()
 
 def sample(print_msg: bool):
     # Activate "msg" if print_msg is True
@@ -262,6 +264,25 @@ example()
 # B
 # A
 # B
+```
+
+```python
+tg = Triggon({"A": True, "B": False})
+
+def sample():
+    # Applies the new value if any label is active.
+    # If both are active, the earlier one takes priority.
+    x = tg.switch_lit(["A", "B"], None)
+
+    print(x)
+
+sample()            # Output: None 
+
+tg.set_trigger("A") # Output: True
+sample()
+
+tg.set_trigger("B") # Output: True
+sample()
 ```
 
 > **Note:**   
@@ -388,6 +409,10 @@ s.sample("*flag", "*num") # Output: flag is False and num is 100
 >
 > In some environments (e.g., Jupyter or REPL),  
 > calls to alter_var or switch_var may not be detected due to source code unavailability.
+>
+> This function only supports  
+> literal values, variables, or simple attribute chains for labels and the `index` keyword.  
+> Other types will raise an `InvalidArgumentError`.
 
 ### revert
 `def revert(self, label: str | list[str] | tuple[str, ...]=None, /, *, all: bool=False, disable: bool=False) -> None`

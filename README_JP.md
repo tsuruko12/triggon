@@ -31,6 +31,9 @@
 ## 計画中の追加機能
 - 値や関数以外のコードの動きも切り替えられるようにしたいと考えています
 
+## 追加予定の機能
+- タイマーによる遅延トリガー制御のサポート
+
 ## インストール方法
 ```bash
 pip install triggon
@@ -187,7 +190,6 @@ example()
 
 ```python
 tg = Triggon("msg", "呼びましたか？")
-F = TrigFunc()
 
 def sample(print_msg: bool):
     # print_msgがTrueの場合に"msg"のフラグを有効にする
@@ -257,6 +259,25 @@ example()
 # B
 # A
 # B
+```
+
+```python
+tg = Triggon({"A": True, "B": False})
+
+def sample():
+    # いずれかのラベルが有効なら、新しい値が適用されます。
+    # 両方が有効な場合は、先に指定された方が優先されます。
+    x = tg.switch_lit(["A", "B"], None)
+
+    print(x)
+
+sample()            # Output: None 
+
+tg.set_trigger("A") # Output: True
+sample()
+
+tg.set_trigger("B") # Output: True
+sample()
 ```
 
 > **Note:**   
@@ -380,6 +401,9 @@ s.sample("*flag", "*num") # 出力: flag: False, num: 100
 >
 > 一部の実行環境では、alter_var や switch_var の呼び出しを静的に検出できず、  
 > エラーになることがあります（例：Jupyter、REPLなど）。
+>
+> この関数では、ラベルおよび`index`引数にリテラル値・変数・属性チェーン以外を指定すると、
+> `InvalidArgumentError`が発生します。
 
 ### revert
 `def revert(self, label: str | list[str] | tuple[str, ...]=None, /, *, all: bool=False, disable: bool=False) -> None`
