@@ -1,9 +1,0 @@
-.venv/
-__pycache__/
-dist/
-*.egg_info/
-*.egg
-triggon/_internal/_err_handler.py
-triggon/_internal/_exceptions.py
-triggon/_internal/_debug.py
-triggon/_internal/_sentinel.py
