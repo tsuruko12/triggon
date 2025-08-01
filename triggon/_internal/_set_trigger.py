@@ -13,7 +13,7 @@ def _check_label_flag(
 
     if self._disable_label[name] or self._trigger_flag[name]:
         return
-    elif self._deley_list.get(label) is not None:
+    elif self._delayed_labels.get(label) is not None:
         return
     
     if cond is not None:
@@ -29,16 +29,16 @@ def _check_label_flag(
             self._get_target_frame(target_func)
             self._print_flag_debug(name, "active", clear=False)
     else:
-        Timer(after, self._deley_trigger, args=(name)).start()
+        Timer(after, self._delay_trigger, args=(name)).start()
 
         if self.debug:
-            self._get_target_frame(target_func, frame=self._deley_list[name])
+            self._get_target_frame(target_func, frame=self._delayed_labels[name])
             self._print_flag_debug(name, "active", after, clear=False)
 
-        self._deley_list[label] = None 
+        self._delayed_labels[label] = None 
     
     self._label_has_var(name, target_func, after)
 
-def _deley_trigger(self, label: str) -> None:
+def _delay_trigger(self, label: str) -> None:
     self._trigger_flag[label] = True
 
