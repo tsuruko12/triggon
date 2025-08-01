@@ -1,10 +1,10 @@
 import inspect
+from threading import Timer
 from typing import Any
 
 from ._exceptions import (
     _FrameAccessError,
     _UnsetExitError,
-    SYMBOL,
 )
 
 
@@ -34,50 +34,43 @@ def _update_var_value(
     if len(var_ref) == 4:     
         setattr(var_ref[3], var_ref[2], update_value)
     else:    
-        self._frame.f_globals[var_ref[2]] = update_value
+        if self._delayed_labels[label] is None:
+            self._frame.f_globals[var_ref[2]] = update_value
+        else:
+            self._delayed_labels[label].f_globals[var_ref[2]] = update_value
 
     if self.debug:
+        if self._delayed_labels[label] is None:
+            deley = False
+        else:
+            deley = True
+
         self._print_var_debug(
-            label, index, trig_flag, inner_index, update_value,
+            label, index, trig_flag, inner_index, update_value, deley=deley,
         )
 
-
-def _check_label_flag(self, label: str, cond: str | None) -> None:
-    target_func = "set_trigger"
-
-    name = label.lstrip(SYMBOL)
-    self._check_exist_label(name)
-
-    if self._disable_label[name] or self._trigger_flag[name]:
-        return
-    
-    if cond is not None:
-        self._get_target_frame(target_func)
-
-        if not self._ensure_safe_cond(cond):
-            return
-        
-    self._trigger_flag[name] = True
-
-    if self.debug:
-        self._get_target_frame(target_func)
-        self._print_flag_debug(name, "active", clear=False)
-
-    self._label_has_var(name, target_func)
-
 def _label_has_var(
-    self, label: str, called_func: str, to_org: bool=False,
+    self, 
+    label: str, called_func: str, after: int | float, to_org: bool=False,
 ) -> None:
     if self._var_list[label] is None:
         return
-    
+
+    self._get_target_frame(called_func)
+
+    if after is None:
+        self._update_all_vars(label, to_org)
+    else:
+        self._delayed_labels[label] = self._frame
+        self._frame = None
+        Timer(after, self._update_all_vars, args=(label, to_org)).start()
+
+def _update_all_vars(self, label: str, to_org: bool) -> None:
     if to_org:
         update_value = self._org_value[label]
     else:
         # Each index always holds a single value.
         update_value = self._new_value[label]
-
-    self._get_target_frame(called_func)
 
     # Restore all variables to their original or new values 
     for i in range(len(self._var_list[label])):
@@ -107,28 +100,32 @@ def _label_has_var(
                 )
 
 def _get_target_frame(
-        self, target_name: str | list[str, str], has_exit: bool=False,
+        self, target_name: str | list[str, str], 
+        frame: str=None, has_exit: bool=False,
 ) -> None:
-   if self._frame is not None:
+   if self._frame is not None and frame is not None:
       return
 
-   frame = inspect.currentframe()
+   if frame is not None:
+       cur_frame = frame
+   else:
+       cur_frame = inspect.currentframe()
 
-   while frame:
+   while cur_frame:
       if has_exit:
-          if frame.f_code.co_name == "<module>":
+          if cur_frame.f_code.co_name == "<module>":
               raise _UnsetExitError()
-          elif frame.f_code.co_name == target_name:
+          elif cur_frame.f_code.co_name == target_name:
               break
       elif isinstance(target_name, list):
-          if frame.f_code.co_name in target_name:
-              self._frame = frame.f_back
+          if cur_frame.f_code.co_name in target_name:
+              self._frame = cur_frame.f_back
               break
-      elif frame.f_code.co_name == target_name:
-         self._frame = frame.f_back
+      elif cur_frame.f_code.co_name == target_name:
+         self._frame = cur_frame.f_back
          break 
       
-      frame = frame.f_back
+      cur_frame = cur_frame.f_back
 
    if has_exit:
        return
