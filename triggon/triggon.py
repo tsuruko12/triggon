@@ -5,9 +5,10 @@ from .trig_func import TrigFunc
 from ._internal import (
   _debug,
   _err_handler,
+  _set_trigger,
+  _switch_var,
   _var_analysis,
   _var_update,
-  _switch_var,
 )
 from ._internal._err_handler import (
   _check_label_type,
@@ -23,11 +24,11 @@ from ._internal._sentinel import _no_value
 
 class Triggon:
     debug: bool
-    _debug_var: dict[str, tuple[int, str] | list[tuple[int, str]]]
     _trigger_flag: dict[str, bool]
     _new_value: dict[str, tuple[Any, ...]]
     _org_value: dict[str, list[Any]]
     _var_list: dict[str, tuple[str, ...] | list[tuple[str, ...]]]
+    _delayed_labels: dict[str, str]
     _disable_label: dict[str, bool]
     _return_value: tuple[bool, Any] | None
     _file_name: str
@@ -64,6 +65,7 @@ class Triggon:
       self._new_value = {}
       self._org_value = {}
       self._var_list = {}  
+      self._delayed_labels = {}
       self._disable_label = {}   
       self._return_value = None
       self._file_name = None
@@ -102,6 +104,7 @@ class Triggon:
         self._new_value[label] = (value,)
 
       self._trigger_flag[label] = False
+      self._delayed_labels[label] = None
       self._disable_label[label] = False
 
       # Create a list of `None` values—one for each index of this label
@@ -110,7 +113,8 @@ class Triggon:
       self._var_list[label] = [None] * length
 
     def set_trigger(
-        self, label: str | list[str] | tuple[str, ...], /, *, cond: str=None,
+        self, label: str | list[str] | tuple[str, ...], /, 
+        *, cond: str=None, after: int | float=None,
     ) -> None:
       """
       Activates the trigger flag for the given labels.
@@ -124,13 +128,16 @@ class Triggon:
       activated if the result is `True`.
       """
 
+      if after is not None and not isinstance(after, (int, float)):
+        raise TypeError("The `after` keyword must be `int` or `float`.")
+
       if isinstance(label, (list, tuple)):
         for name in label:
           _check_label_type(name, allow_dict=False)       
-          self._check_label_flag(name, cond)
+          self._check_label_flag(name, cond, after)
       else:
         _check_label_type(label, allow_dict=False)
-        self._check_label_flag(label, cond)
+        self._check_label_flag(label, cond, after)
         
       self._clear_frame()
 
@@ -168,10 +175,6 @@ class Triggon:
 
         # When all labels' triggers are inactive
         if not isinstance(label, str):
-          if self.debug:
-            self._get_target_frame(cur_functions)
-            self._print_val_debug(name, index, flag, org)
-
           return org
 
       name = label.lstrip(SYMBOL)
@@ -217,13 +220,13 @@ class Triggon:
         if len(change_list) == 1:
           # When only one label is provided
           label = next(iter(change_list))
-          name = label.lstrip(SYMBOL)     
+          name = label.lstrip(SYMBOL)   
 
           if index is None:
             index = self._count_symbol(label)
 
           if not init_flag:
-            init_flag = (self._init_or_not(name, index))
+            init_flag = self._init_or_not(name, index)
 
           trig_flag = self._trigger_flag[name]
           vars = self._var_list[name][index]
@@ -308,7 +311,7 @@ class Triggon:
         return 
 
       if disable:
-        state = "disable" # for debug
+        state = "disable"  # for debug
         self._disable_label[name] = True
       else:
         state = "inactive" # for debug
@@ -346,7 +349,7 @@ class Triggon:
         if the trigger flag is active.
 
         If `do_print` is True, prints the value with the early return.  
-        Raises `InvalidArgumentError` if the value is not a string.
+        Raises `TypeError` if the value is not a string.
         """
 
         name = label.lstrip(SYMBOL)
@@ -360,12 +363,12 @@ class Triggon:
             
         if do_print:
            if ret is None and not isinstance(self._new_value[name][index], str):
-             raise InvalidArgumentError(
+             raise TypeError(
                 "Expected a value of type `str`, "
                 f"but got `{type(self._new_value[name][index]).__name__}`."
              )   
            elif ret is not None and not isinstance(ret, str):
-             raise InvalidArgumentError(
+             raise TypeError(
                 "Expected a value of type `str`, "
                 f"but got `{type(ret).__name__}`."
              )
@@ -406,7 +409,14 @@ class Triggon:
     alter_var = switch_var
 
 
-modules = [_debug, _err_handler, _var_analysis, _var_update, _switch_var]
+modules = [
+  _debug, 
+  _err_handler, 
+  _set_trigger, 
+  _switch_var, 
+  _var_analysis, 
+  _var_update,
+]
 
 for module in modules:
   for name, func in vars(module).items():
