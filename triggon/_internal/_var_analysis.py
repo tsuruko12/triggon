@@ -135,13 +135,13 @@ def _arg_is_dict(self, target: ast.Dict) -> bool:
 def _arg_is_seq(
       self, target: ast.List | ast.Tuple, label: str, index: int,
 ) -> bool:
-    target_index = self._var_list[label][index] 
+    target_index = self._var_refs[label][index] 
 
     if target_index is None:
-      self._var_list[label][index] = []
+      self._var_refs[label][index] = []
     elif isinstance(target_index, tuple):
        # convert to a list for adding values
-       self._var_list[label][index] = [target_index]
+       self._var_refs[label][index] = [target_index]
 
     for val in target.elts:
       _identify_arg(val)
@@ -157,13 +157,13 @@ def _arg_is_seq(
 
     return True
 
-def _arg_is_name(self, target: str, label: str, index: int,) -> bool: 
+def _arg_is_name(self, target: str, label: str, index: int) -> bool: 
    try:
       org_value = self._frame.f_globals[target]
    except KeyError:
       raise InvalidArgumentError(VAR_ERROR)
 
-   target_index = self._var_list[label][index]
+   target_index = self._var_refs[label][index]
 
    # (file neme, line number, var name)
    var_refs = (self._file_name, self._lineno, target)
@@ -174,11 +174,11 @@ def _arg_is_name(self, target: str, label: str, index: int,) -> bool:
          return True
       
       if isinstance(target_index, tuple):
-         self._var_list[label][index] = [target_index]
+         self._var_refs[label][index] = [target_index]
 
-      self._var_list[label][index].append(var_refs)
+      self._var_refs[label][index].append(var_refs)
    else:
-      self._var_list[label][index] = var_refs
+      self._var_refs[label][index] = var_refs
 
    self._store_org_value(label, index, org_value)
    self._find_match_var(label, index)
@@ -191,7 +191,7 @@ def _arg_is_attr(
     var_name = self._try_search_var(target, err_check=True)
     instance = self._frame.f_locals[var_name]
 
-    target_index = self._var_list[label][index]
+    target_index = self._var_refs[label][index]
 
     # (file name, line number, attr name, class instance)
     var_refs = (self._file_name, self._lineno, target.attr, instance)
@@ -202,11 +202,11 @@ def _arg_is_attr(
          return True
       
       if isinstance(target_index, tuple):
-         self._var_list[label][index] = [target_index]
+         self._var_refs[label][index] = [target_index]
 
-      self._var_list[label][index].append(var_refs)
+      self._var_refs[label][index].append(var_refs)
     else:
-       self._var_list[label][index] = var_refs
+       self._var_refs[label][index] = var_refs
 
     org_value = instance.__dict__[target.attr]  
     self._store_org_value(label, index, org_value)
@@ -216,16 +216,23 @@ def _arg_is_attr(
     
 def _ensure_safe_cond(self, expr: str) -> bool:
    if not isinstance(expr, str):
-      raise InvalidArgumentError("'cond' must be a string if provided.")
+      raise TypeError("'cond' must be a string if provided.")
    
    allowed = (
-        ast.Expression,
-        ast.Compare, ast.Name, ast.Attribute, ast.Constant, 
-        ast.Is, ast.IsNot, ast.In, ast.NotIn,
-        ast.Load, ast.Eq, ast.NotEq, ast.Lt, 
-        ast.Gt, ast.LtE, ast.GtE, ast.BoolOp, 
-        ast.And, ast.Or, ast.UnaryOp, ast.Not,
+      ast.Expression,
+      ast.Compare, ast.Name, ast.Attribute, ast.Constant,
+      ast.Subscript, ast.Slice, ast.Tuple, ast.List, ast.Set, ast.Dict,
+      ast.Is, ast.IsNot, ast.In, ast.NotIn,
+      ast.Load, ast.Eq, ast.NotEq, ast.Lt, 
+      ast.Gt, ast.LtE, ast.GtE, ast.BoolOp, 
+      ast.And, ast.Or, ast.UnaryOp, ast.Not,
+      ast.BinOp, ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Mod,
+      ast.Pow, ast.FloorDiv, ast.MatMult,
+      ast.BitAnd, ast.BitOr, ast.BitXor,
+      ast.LShift, ast.RShift, 
+      ast.UAdd, ast.USub, ast.Invert  
    )
+
 
    try:
       tree = ast.parse(expr, mode="eval")
