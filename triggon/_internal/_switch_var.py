@@ -5,7 +5,7 @@ def _init_or_not(self, label: str, index: int) -> bool:
     self._compare_value_counts(label, index)
 
     if (
-        self._var_list[label][index] is None 
+        self._var_refs[label][index] is None 
         or self._is_new_var(label, index)
     ):  
         # Initial process to store argument variables 
@@ -15,12 +15,12 @@ def _init_or_not(self, label: str, index: int) -> bool:
     return False
 
 def _is_new_var(
-        self, label: str, index: int, target_ref: tuple[str, ...]=None,
+        self, label: str, index: int, target_ref: tuple[str, ...] = None,
 ) -> bool:
     # If both the file name and line number match,
     # the variable is already registered.
 
-    var_ref = self._var_list[label][index]
+    var_ref = self._var_refs[label][index]
 
     if isinstance(var_ref, tuple):
         if target_ref is not None:
@@ -42,17 +42,17 @@ def _is_new_var(
         
     return True
 
-def _find_match_var(self, label: str=None, index: int=None) -> None:
+def _find_match_var(self, label: str = None, index: int = None) -> None:
     # Used to retrieve the original value for `revert()`
 
     # it can be a list or tuple
-    var_ref = self._var_list[label][index]
+    var_ref = self._var_refs[label][index]
 
     # Searrch up to the same label
     stop_flag = False
 
     # `value` is a list
-    for key, value in self._var_list.items(): 
+    for key, value in self._var_refs.items(): 
         if stop_flag:
             return
         
@@ -65,25 +65,25 @@ def _find_match_var(self, label: str=None, index: int=None) -> None:
                 continue
             elif isinstance(list_val, tuple) and isinstance(var_ref, tuple):
                 if self._is_ref_match(list_val, var_ref):
-                    self._org_value[label][index] = self._org_value[key][i]     
+                    self._org_values[label][index] = self._org_values[key][i]     
             elif isinstance(list_val, tuple) and isinstance(var_ref, list):
                 for i_2, ref_v in enumerate(var_ref):
                     if self._is_ref_match(list_val, ref_v):
-                        self._org_value[label][index][i_2] = (
-                            self._org_value[key][i]
+                        self._org_values[label][index][i_2] = (
+                            self._org_values[key][i]
                         )
             elif isinstance(list_val, list) and isinstance(var_ref, tuple):
                 for i_2, l_v in enumerate(list_val):
                     if self._is_ref_match(l_v, var_ref):
-                        self._org_value[label][index] = (
-                            self._org_value[key][i][i_2]
+                        self._org_values[label][index] = (
+                            self._org_values[key][i][i_2]
                         )
             else:
                 for ref_i, ref_val in enumerate(var_ref):
                     for list_i, v in enumerate(list_val):
                         if self._is_ref_match(v, ref_val):                           
-                            self._org_value[label][index][ref_i] = (
-                                self._org_value[key][i][list_i]
+                            self._org_values[label][index][ref_i] = (
+                                self._org_values[key][i][list_i]
                             )
 
 def _is_ref_match(
