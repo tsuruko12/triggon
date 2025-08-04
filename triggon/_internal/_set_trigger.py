@@ -4,16 +4,16 @@ from ._exceptions import SYMBOL
 
 
 def _check_label_flag(
-        self, label: str, cond: str | None, after: int | float,
+        self, label: str, cond: str | None, after: int | float | None,
 ) -> None:
     target_func = "set_trigger"
 
     name = label.lstrip(SYMBOL)
     self._check_exist_label(name)
 
-    if self._disable_label[name] or self._trigger_flag[name]:
+    if self._disable_flags[name] or self._trigger_flags[name]:
         return
-    elif self._delayed_labels.get(label) is not None:
+    elif self._delay_info[name][0] is not None:
         return
     
     if cond is not None:
@@ -23,22 +23,16 @@ def _check_label_flag(
             return
         
     if after is None:
-        self._trigger_flag[label] = True
-
-        if self.debug:
-            self._get_target_frame(target_func)
-            self._print_flag_debug(name, "active", clear=False)
+        self._activate_trigger(name)
     else:
-        Timer(after, self._delay_trigger, args=(name)).start()
+        Timer(after, self._activate_trigger, args=(name,)).start()
 
-        if self.debug:
-            self._get_target_frame(target_func, frame=self._delayed_labels[name])
-            self._print_flag_debug(name, "active", after, clear=False)
-
-        self._delayed_labels[label] = None 
+    if self.debug:
+        self._get_target_frame(target_func)
+        self._print_flag_debug(name, "active", after, clear=False) 
     
     self._label_has_var(name, target_func, after)
 
-def _delay_trigger(self, label: str) -> None:
-    self._trigger_flag[label] = True
+def _activate_trigger(self, label: str) -> None:
+    self._trigger_flags[label] = True
 
