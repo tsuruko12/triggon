@@ -9,17 +9,21 @@ from ._exceptions import (
 
 
 def _store_org_value(self, label: str, index: int, org_value: Any) -> None:
-    target_index = self._org_value[label][index] 
+    target_index = self._org_values[label][index] 
 
     if target_index is None:
-        self._org_value[label][index] = []
+        self._org_values[label][index] = []
 
-    self._org_value[label][index].append(org_value)
+    self._org_values[label][index].append(org_value)
 
 def _update_var_value(
-    self, var_ref: tuple[str, ...] | list[tuple[str, ...]], 
-    label: str, index: int, update_value: Any, 
-    inner_index: int=None, to_org: bool=False,
+    self, 
+    var_ref: tuple[str, ...] | list[tuple[str, ...]], 
+    label: str, 
+    index: int, 
+    update_value: Any, 
+    inner_index: int = None, 
+    to_org: bool = False,
 ) -> None:
     # var_ref can be:
     # - (file name, lineno, var name) for globals
@@ -28,19 +32,21 @@ def _update_var_value(
 
     if to_org:
         trig_flag = False
+        i = 1
     else:
         trig_flag = True
+        i = 0
   
     if len(var_ref) == 4:     
         setattr(var_ref[3], var_ref[2], update_value)
     else:    
-        if self._delayed_labels[label] is None:
+        if self._delay_info[label][i] is None:
             self._frame.f_globals[var_ref[2]] = update_value
         else:
-            self._delayed_labels[label].f_globals[var_ref[2]] = update_value
+            self._delay_info[label][i].f_globals[var_ref[2]] = update_value
 
     if self.debug:
-        if self._delayed_labels[label] is None:
+        if self._delay_info[label][i] is None:
             deley = False
         else:
             deley = True
@@ -50,31 +56,37 @@ def _update_var_value(
         )
 
 def _label_has_var(
-    self, 
-    label: str, called_func: str, after: int | float, to_org: bool=False,
+    self, label: str, called_func: str, after: int | float, 
+    to_org: bool = False,
 ) -> None:
-    if self._var_list[label] is None:
+    if after is None and self._var_refs[label] is None:
         return
+    
+    self._get_target_frame(called_func)   
 
-    self._get_target_frame(called_func)
-
-    if after is None:
+    if after is None:            
         self._update_all_vars(label, to_org)
     else:
-        self._delayed_labels[label] = self._frame
-        self._frame = None
+        if to_org:
+            self._delay_info[label][1] = self._frame
+        else:
+            self._delay_info[label][0] = self._frame
+
+        if self._var_refs[label] is None:
+            return
+
         Timer(after, self._update_all_vars, args=(label, to_org)).start()
 
 def _update_all_vars(self, label: str, to_org: bool) -> None:
     if to_org:
-        update_value = self._org_value[label]
+        update_value = self._org_values[label]
     else:
         # Each index always holds a single value.
-        update_value = self._new_value[label]
+        update_value = self._new_values[label]
 
     # Restore all variables to their original or new values 
-    for i in range(len(self._var_list[label])):
-        var_ref = self._var_list[label][i]
+    for i in range(len(self._var_refs[label])):
+        var_ref = self._var_refs[label][i]
 
         if var_ref is None:
             continue
@@ -99,17 +111,18 @@ def _update_all_vars(self, label: str, to_org: bool) -> None:
                     var_ref, label, i, update_value[i], to_org=to_org,
                 )
 
+    if to_org and self._delay_info[label][1] is not None:
+        self._delay_info[label][1] = None
+    elif not to_org and self._delay_info[label][0] is not None:
+        self._delay_info[label][0] = None
+
 def _get_target_frame(
-        self, target_name: str | list[str, str], 
-        frame: str=None, has_exit: bool=False,
+        self, target_name: str | list[str, str], has_exit: bool = False,
 ) -> None:
-   if self._frame is not None and frame is not None:
+   if self._frame is not None:
       return
 
-   if frame is not None:
-       cur_frame = frame
-   else:
-       cur_frame = inspect.currentframe()
+   cur_frame = inspect.currentframe()
 
    while cur_frame:
       if has_exit:
