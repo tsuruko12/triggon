@@ -1,3 +1,4 @@
+from time import sleep
 from types import FrameType
 from typing import Any
 
@@ -5,6 +6,7 @@ from .trig_func import TrigFunc
 from ._internal import (
   _debug,
   _err_handler,
+  _revert,
   _set_trigger,
   _switch_var,
   _var_analysis,
@@ -24,26 +26,26 @@ from ._internal._sentinel import _no_value
 
 class Triggon:
     debug: bool
-    _trigger_flag: dict[str, bool]
-    _new_value: dict[str, tuple[Any, ...]]
-    _org_value: dict[str, list[Any]]
-    _var_list: dict[str, tuple[str, ...] | list[tuple[str, ...]]]
-    _delayed_labels: dict[str, str]
-    _disable_label: dict[str, bool]
-    _return_value: tuple[bool, Any] | None
+    _trigger_flags: dict[str, bool]
+    _new_values: dict[str, tuple[Any, ...]]
+    _org_values: dict[str, list[Any]]
+    _var_refs: dict[str, tuple[str, ...] | list[tuple[str, ...]]]
+    _delay_info: dict[str, str]
+    _disable_flags: dict[str, bool]
+    _return_values: tuple[bool, Any] | None
     _file_name: str
     _lineno: int
     _frame: FrameType
 
-    # `new_value`: Each label holds a tuple of values.
-    # `org_value`: Each label index holds a list of values,
+    # `new_values`: Each label holds a tuple of values.
+    # `org_values`: Each label index holds a list of values,
     #              or None if unset.
-    # `var_list`: Each label index holds a tuple of strings,
+    # `var_refs`: Each label index holds a tuple of strings,
     #             a list of such tuples, or None if unset.
 
     def __init__(
-        self, label: str | dict[str, Any], /, new: Any=None, 
-        *, debug: bool=False,
+        self, label: str | dict[str, Any], /, new: Any = None, 
+        *, debug: bool = False,
     ) -> None:
       """
       Registers labels and their corresponding values.
@@ -61,13 +63,13 @@ class Triggon:
       """
 
       self.debug = debug
-      self._trigger_flag = {}
-      self._new_value = {}
-      self._org_value = {}
-      self._var_list = {}  
-      self._delayed_labels = {}
-      self._disable_label = {}   
-      self._return_value = None
+      self._trigger_flags = {}
+      self._new_values = {}
+      self._org_values = {}
+      self._var_refs = {}  
+      self._delay_info = {}
+      self._disable_flags = {}   
+      self._return_values = None
       self._file_name = None
       self._lineno = None
       self._frame = None
@@ -88,7 +90,7 @@ class Triggon:
           
           self._add_new_label(key, value)
 
-    def _add_new_label(self, label: str, value: Any, /) -> None:
+    def _add_new_label(self, label: str, value: Any) -> None:
       # The value is normalized to a tuple
       if isinstance(value, (list, tuple)):
         length = len(value)
@@ -96,25 +98,26 @@ class Triggon:
         if length == 0:
           # An empty sequence is handled as a single value
           length = 1
-          self._new_value[label] = (value,)
+          self._new_values[label] = (value,)
         else:
-          self._new_value[label] = tuple(value)
+          self._new_values[label] = tuple(value)
       else:
         length = 1
-        self._new_value[label] = (value,)
+        self._new_values[label] = (value,)
 
-      self._trigger_flag[label] = False
-      self._delayed_labels[label] = None
-      self._disable_label[label] = False
+      self._trigger_flags[label] = False
+      self._disable_flags[label] = False
+      # [trigger_frame, revert_frame] for delayed triggers; None if not delayed
+      self._delay_info[label] = [None, None]
 
       # Create a list of `None` values—one for each index of this label
       # (`length` is greater than 0)
-      self._org_value[label] = [None] * length
-      self._var_list[label] = [None] * length
+      self._org_values[label] = [None] * length
+      self._var_refs[label] = [None] * length
 
     def set_trigger(
         self, label: str | list[str] | tuple[str, ...], /, 
-        *, cond: str=None, after: int | float=None,
+        *, cond: str = None, after: int | float = None,
     ) -> None:
       """
       Activates the trigger flag for the given labels.
@@ -143,7 +146,7 @@ class Triggon:
 
     def switch_lit(
         self, label: str | list[str] | tuple[str, ...], /, org: Any, 
-        *, index: int=None,
+        *, index: int = None,
     ) -> Any:
       """
       Changes the value at the specified label(s) and position 
@@ -169,7 +172,7 @@ class Triggon:
           stripped_label = v.lstrip(SYMBOL)
           self._check_exist_label(stripped_label)
 
-          if self._trigger_flag[stripped_label]:
+          if self._trigger_flags[stripped_label]:
             label = v
             break
 
@@ -184,14 +187,14 @@ class Triggon:
         index = self._count_symbol(label)
       self._compare_value_counts(name, index)
 
-      flag = self._trigger_flag[name]
+      flag = self._trigger_flags[name]
 
       if not flag:
         ret_value = org
         new_val = _no_value # for debug
       else:
-        ret_value = self._new_value[name][index] 
-        new_val = self._new_value[name][index] # for debug
+        ret_value = self._new_values[name][index] 
+        new_val = self._new_values[name][index] # for debug
 
       if self.debug:
         self._get_target_frame(cur_functions)
@@ -200,8 +203,8 @@ class Triggon:
       return ret_value
 
     def switch_var(
-          self, label: str | dict[str, Any], var: Any=None, /, 
-          *, index: int=None,
+          self, label: str | dict[str, Any], var: Any = None, /, 
+          *, index: int = None,
     ) -> None | Any:
         """
         Change the value of variables associated with the given label 
@@ -228,17 +231,21 @@ class Triggon:
           if not init_flag:
             init_flag = self._init_or_not(name, index)
 
-          trig_flag = self._trigger_flag[name]
-          vars = self._var_list[name][index]
+          trig_flag = self._trigger_flags[name]
+          vars = self._var_refs[name][index]
 
-          if not trig_flag:
+          if not init_flag:
+             return var
+          elif not trig_flag and self._delay_info[name][0] is None:
             self._clear_frame()
             return var
-          elif not init_flag:
-             return var
+          
+          if self._delay_info[name][0] is not None:   
+              while not self._trigger_flags[name]:
+                sleep(0.001)
 
           self._update_var_value(
-            vars, name, index, self._new_value[name][index],
+            vars, name, index, self._new_values[name][index],
           )      
           self._clear_frame()
 
@@ -262,21 +269,30 @@ class Triggon:
             if not init_flag:
               continue
 
-            trig_flag = self._trigger_flag[name]
-            vars = self._var_list[name][index]  
+            trig_flag = self._trigger_flags[name]
+            vars = self._var_refs[name][index]  
 
-            if not trig_flag:
-              continue          
+            if not trig_flag and self._delay_info[name][0] is None:
+              continue     
+
+            if self._delay_info[name][0] is not None:   
+              while not self._trigger_flags[name]:
+                sleep(0.001)
 
             self._update_var_value(
-              vars, name, index, self._new_value[name][index],
+                vars, name, index, self._new_values[name][index],
             )
-            
+
           self._clear_frame()
 
     def revert(
-          self, label: str | list[str] | tuple[str, ...]=None, /, 
-          *, all: bool=False, disable: bool=False,
+          self, 
+          label: str | list[str] | tuple[str, ...] = None, 
+          /, 
+          *, 
+          all: bool = False, 
+          disable: bool = False, 
+          after: int | float = None,
     ) -> None:
       """
       Revert the trigger flag(s) set by `set_trigger()` back to False.
@@ -285,43 +301,23 @@ class Triggon:
       If `disable` is set to True, the label(s) will be permanently disabled.
       """
 
+      if after is not None and not isinstance(after, (int, float)):
+        raise TypeError("The `after` keyword must be `int` or `float`.")
+
       if label is None:
         if not all:
           raise InvalidArgumentError("No labels specified to revert.")
         
-        for key in self._new_value.keys():
-          self._revert_label(key, disable)      
+        labels = self._new_values.keys()  
       elif isinstance(label, (list, tuple)):
-        for name in label:
-          self._revert_label(name, disable)
+        labels = label
       else:
-        self._revert_label(label, disable)  
+        labels = [label]
 
-      self._clear_frame()      
+      for name in labels:
+        self._revert_value(name, disable, after) 
 
-    def _revert_label(self, label: str, disable: bool) -> None:
-      _check_label_type(label, allow_dict=False)
-
-      name = label.lstrip(SYMBOL)
-      self._check_exist_label(name)
-
-      if not disable and not self._trigger_flag[name]:
-        return
-      elif disable and self._disable_label[name]:
-        return 
-
-      if disable:
-        state = "disable"  # for debug
-        self._disable_label[name] = True
-      else:
-        state = "inactive" # for debug
-      self._trigger_flag[name] = False
-
-      self._label_has_var(name, "revert", to_org=True)
-
-      if self.debug:
-        self._get_target_frame("revert")
-        self._print_flag_debug(name, state)    
+      self._clear_frame()         
     
     def exit_point(self, label: str, func: TrigFunc, /) -> None | Any:
       """
@@ -335,14 +331,14 @@ class Triggon:
       try:
           return func()
       except _ExitEarly:
-          if not self._return_value[0]:
-              return self._return_value[1]
+          if not self._return_values[0]:
+              return self._return_values[1]
           
-          print(self._return_value[1])
+          print(self._return_values[1])
 
     def trigger_return(
-        self, label: str, /, ret: Any=None, 
-        *, index: int=None, do_print: bool=False,
+        self, label: str, /, ret: Any = None, 
+        *, index: int = None, do_print: bool = False,
     ) -> None | Any:
         """
         Executes an early return using the set return value,  
@@ -358,14 +354,14 @@ class Triggon:
         if index is None:
            index = self._count_symbol(label)
 
-        if not self._trigger_flag[name]:
+        if not self._trigger_flags[name]:
             return 
             
         if do_print:
-           if ret is None and not isinstance(self._new_value[name][index], str):
+           if ret is None and not isinstance(self._new_values[name][index], str):
              raise TypeError(
                 "Expected a value of type `str`, "
-                f"but got `{type(self._new_value[name][index]).__name__}`."
+                f"but got `{type(self._new_values[name][index]).__name__}`."
              )   
            elif ret is not None and not isinstance(ret, str):
              raise TypeError(
@@ -374,11 +370,11 @@ class Triggon:
              )
 
         if ret is None:
-          value = self._new_value[name][index]
+          value = self._new_values[name][index]
         else:
           value = ret   
                     
-        self._return_value = (do_print, value)
+        self._return_values = (do_print, value)
 
         if self.debug:
           self._get_target_frame("trigger_return")
@@ -397,7 +393,7 @@ class Triggon:
         name = label.lstrip(SYMBOL)
         self._check_exist_label(name)
 
-        if self._trigger_flag[name]:
+        if self._trigger_flags[name]:
             if self.debug:
               self._get_target_frame("trigger_func")
               self._print_trig_debug(name, "Trigger a function") 
@@ -412,6 +408,7 @@ class Triggon:
 modules = [
   _debug, 
   _err_handler, 
+  _revert,
   _set_trigger, 
   _switch_var, 
   _var_analysis, 
