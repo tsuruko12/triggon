@@ -14,7 +14,7 @@ class TrigFunc:
 
   _func: Callable | None
 
-  def __init__(self, func: Callable=None) -> None:
+  def __init__(self, func: Callable = None, /) -> None:
     self._func = func
 
   def __call__(self, *args, **kwargs) -> "TrigFunc":
