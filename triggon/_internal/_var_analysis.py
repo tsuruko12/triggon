@@ -14,6 +14,15 @@ VAR_ERROR = "Local arguments are not supported in this function."
 NEST_ERROR = (
    "Variables should not be nested in lists or tuples (e.g. [x, [y]])."
 )
+INVALID_LABEL_INDEX_TYPE = (
+   "Labels and the `index` keyword must be literals, variables, "
+   "or simple attribute access."
+)
+
+# If the same function is called multiple times on the same line 
+# (e.g., within a comparison expression),
+# variables from all of those calls will be registered 
+# in a single processing step.
 
 
 def _trace_func_call(self) -> None:
@@ -34,7 +43,7 @@ def _trace_func_call(self) -> None:
         # or lines that would raise an `IndentationError`.
         continue
       else:
-        # walk through AST nodes to find function calls
+        # Walk through AST nodes to find function calls
         
         for node in ast.walk(line_range):
           if not isinstance(node, ast.Call):
@@ -48,10 +57,18 @@ def _trace_func_call(self) -> None:
 
           first_arg = node.args[0]
 
-          # handle each argument type differently
+          # Check if 'index' keyword is set
+          if node.keywords:
+             for kw in node.keywords:
+               index_node = kw.value
+               index = self._analyze_index(index_node)
+          else:
+             index = None
+
+          # Handle each argument type differently
 
           if isinstance(first_arg, ast.Dict):
-            result = self._arg_is_dict(first_arg)
+            result = self._arg_is_dict(first_arg, index)
           else:
              try:
                second_arg = node.args[1]
@@ -60,30 +77,18 @@ def _trace_func_call(self) -> None:
                    "Provide variables as the second argument."
                 )
              
-             _identify_arg(second_arg)
+             _check_var_arg(second_arg)
 
              label = self._try_search_value(first_arg)
 
-             # check if 'index' keyword is set
-             if 0 < len(node.keywords):
-                index = None
-
-                for kw in node.keywords:
-                   if kw.arg != "index":
-                      continue
-                   
-                   index_node = kw.value
-                   index = self._try_search_value(index_node)
-
-                if index is None:
-                   index = self._count_symbol(label)
-             else:
-                index = self._count_symbol(label)
+             # The `index` is standardized as a tuple
+             if index is None:
+                index = (self._count_symbol(label),)
 
              name = label.lstrip(SYMBOL) 
 
              self._check_exist_label(name)
-             self._compare_value_counts(name, index)
+             self._compare_value_counts(name, index, allow_tuple=True)
 
              if isinstance(second_arg, (ast.List, ast.Tuple)):
                 result = self._arg_is_seq(second_arg, name, index)
@@ -104,113 +109,126 @@ def _trace_func_call(self) -> None:
            "where the source code is unavailable or dynamically executed."
         )   
   
-def _arg_is_dict(self, target: ast.Dict) -> bool:
+def _arg_is_dict(
+      self, target: ast.Dict, index: tuple[int, ...] | None,
+) -> bool:
     arg_list = self._deduplicate_labels(target)
+
+    # The `index` is standardized as a tuple
+    if index is not None:
+       i = index
   
     for key, val in arg_list.items():
       label = key.lstrip(SYMBOL)
-      index = self._count_symbol(key)
+
+      if index is None:
+         i = (self._count_symbol(key),)
 
       self._check_exist_label(label)
-      self._compare_value_counts(label, index)
+      self._compare_value_counts(label, i, allow_tuple=True)
 
       # Handle each argument type differently
 
       if isinstance(val, (ast.List, ast.Tuple)):
-        _ = self._arg_is_seq(val, label, index)
+        _ = self._arg_is_seq(val, label, i)
       elif isinstance(val, ast.Dict):
          raise InvalidArgumentError(VALUE_TYPE_ERROR)
       else:
-        _identify_arg(val)
+        _check_var_arg(val)
 
         if isinstance(val, ast.Name):
-          _ = self._arg_is_name(val.id, label, index)
+          _ = self._arg_is_name(val.id, label, i)
         elif isinstance(val, ast.Attribute):
-          _ = self._arg_is_attr(val, label, index)
+          _ = self._arg_is_attr(val, label, i)
         else:
            raise InvalidArgumentError(VALUE_TYPE_ERROR)
 
     return True
 
 def _arg_is_seq(
-      self, target: ast.List | ast.Tuple, label: str, index: int,
+      self, target: ast.List | ast.Tuple, label: str, index: tuple[int, ...], 
 ) -> bool:
-    target_index = self._var_refs[label][index] 
+    for i in index:    
+      target_index = self._var_refs[label][i] 
 
-    if target_index is None:
-      self._var_refs[label][index] = []
-    elif isinstance(target_index, tuple):
-       # convert to a list for adding values
-       self._var_refs[label][index] = [target_index]
+      if target_index is None:
+         self._var_refs[label][i] = []
+      elif isinstance(target_index, tuple):
+         # convert to a list for adding values
+         self._var_refs[label][i] = [target_index]
 
-    for val in target.elts:
-      _identify_arg(val)
+      for val in target.elts:
+         _check_var_arg(val)
 
-      if isinstance(val, ast.Name):
-        _ = self._arg_is_name(val.id, label, index)
-      elif isinstance(val, ast.Attribute):
-        _ = self._arg_is_attr(val, label, index)  
-      elif isinstance(val, (ast.List, ast.Tuple, ast.Dict)):
-         raise InvalidArgumentError(NEST_ERROR)
-      else:
-        raise InvalidArgumentError(VALUE_TYPE_ERROR)
-
+         if isinstance(val, ast.Name):
+            _ = self._arg_is_name(val.id, label, index)
+         elif isinstance(val, ast.Attribute):
+            _ = self._arg_is_attr(val, label, index)  
+         elif isinstance(val, (ast.List, ast.Tuple, ast.Dict)):
+            raise InvalidArgumentError(NEST_ERROR)
+         else:
+            raise InvalidArgumentError(VALUE_TYPE_ERROR)
+      
     return True
 
-def _arg_is_name(self, target: str, label: str, index: int) -> bool: 
+def _arg_is_name(
+      self, target: str, label: str, index: tuple[int, ...],
+) -> bool: 
    try:
       org_value = self._frame.f_globals[target]
    except KeyError:
       raise InvalidArgumentError(VAR_ERROR)
+   
+   for i in index:
+      target_index = self._var_refs[label][i]
 
-   target_index = self._var_refs[label][index]
+      # (file neme, line number, var name)
+      var_refs = (self._file_name, self._lineno, target)
 
-   # (file neme, line number, var name)
-   var_refs = (self._file_name, self._lineno, target)
+      if target_index is not None:
+         if not self._is_new_var(label, i, var_refs):
+            # The variable has already been registered
+            return True
+         
+         if isinstance(target_index, tuple):
+            self._var_refs[label][i] = [target_index]
 
-   if target_index is not None:
-      if not self._is_new_var(label, index, var_refs):
-         # The variable has already been registered
-         return True
-      
-      if isinstance(target_index, tuple):
-         self._var_refs[label][index] = [target_index]
+         self._var_refs[label][i].append(var_refs)
+      else:
+         self._var_refs[label][i] = var_refs
 
-      self._var_refs[label][index].append(var_refs)
-   else:
-      self._var_refs[label][index] = var_refs
-
-   self._store_org_value(label, index, org_value)
-   self._find_match_var(label, index)
+      self._store_org_value(label, i, org_value)
+      self._find_match_var(label, i)
 
    return True
 
 def _arg_is_attr(
-      self, target: ast.Attribute, label: str, index: int,
+      self, target: ast.Attribute, label: str, index: tuple[int, ...],
 ) -> bool:
     var_name = self._try_search_var(target, err_check=True)
     instance = self._frame.f_locals[var_name]
 
-    target_index = self._var_refs[label][index]
+    for i in index:
+      target_index = self._var_refs[label][i]
 
-    # (file name, line number, attr name, class instance)
-    var_refs = (self._file_name, self._lineno, target.attr, instance)
+      # (file name, line number, attr name, class instance)
+      var_refs = (self._file_name, self._lineno, target.attr, instance)
 
-    if target_index is not None:
-      if not self._is_new_var(label, index, var_refs):
-         # The variable has already been registered
-         return True
-      
-      if isinstance(target_index, tuple):
-         self._var_refs[label][index] = [target_index]
+      if target_index is not None:
+         if not self._is_new_var(label, i, var_refs):
+            # The variable has already been registered
+            return True
+         
+         if isinstance(target_index, tuple):
+            self._var_refs[label][i] = [target_index]
 
-      self._var_refs[label][index].append(var_refs)
-    else:
-       self._var_refs[label][index] = var_refs
+         self._var_refs[label][i].append(var_refs)
+      else:
+         self._var_refs[label][i] = var_refs
 
-    org_value = instance.__dict__[target.attr]  
-    self._store_org_value(label, index, org_value)
-    self._find_match_var(label, index)
+      org_value = instance.__dict__[target.attr]  
+      self._store_org_value(label, i, org_value)
+      self._find_match_var(label, i)
 
     return True 
     
@@ -230,7 +248,7 @@ def _ensure_safe_cond(self, expr: str) -> bool:
       ast.Pow, ast.FloorDiv, ast.MatMult,
       ast.BitAnd, ast.BitOr, ast.BitXor,
       ast.LShift, ast.RShift, 
-      ast.UAdd, ast.USub, ast.Invert  
+      ast.UAdd, ast.USub, ast.Invert,
    )
 
 
@@ -266,6 +284,31 @@ def _deduplicate_labels(self, target: ast.Dict) -> dict[str, ast.AST]:
          
     return sorted_list
 
+def _analyze_index(self, index: ast.AST) -> tuple[int, ...]:
+   if isinstance(index, ast.Tuple):
+      indices = []
+
+      for v in index.elts:
+         value = self._try_search_value(v)
+         indices.append(value)
+
+      return tuple(indices)
+   elif isinstance(index, ast.Call):
+      if index.func.id != "range":
+         raise InvalidArgumentError(INVALID_LABEL_INDEX_TYPE)
+      
+      indices = []
+
+      for arg in index.args:
+         value = self._try_search_value(arg)
+         indices.append(value)
+      
+      return tuple(indices)
+   elif isinstance(index, ast.Constant):
+      return (index.value,)
+   else:
+      raise InvalidArgumentError(INVALID_LABEL_INDEX_TYPE)
+
 def _try_search_value(self, var: ast.AST) -> int | str:
    if isinstance(var, ast.Constant):
       value = var.value
@@ -281,15 +324,12 @@ def _try_search_value(self, var: ast.AST) -> int | str:
          instance = self._frame.f_locals[var_name]
          value = instance.__dict__[var.attr]
    else:
-      raise InvalidArgumentError(
-         "Only literals, variables, or simple attribute access " 
-         "are allowed for labels or the index keyword in this function."
-      )
+      raise InvalidArgumentError(INVALID_LABEL_INDEX_TYPE)
    
    return value
 
 
-def _identify_arg(target: ast.AST) -> None:
+def _check_var_arg(target: ast.AST) -> None:
     if isinstance(target, ast.Constant):
       raise InvalidArgumentError(VALUE_TYPE_ERROR)
     
