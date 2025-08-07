@@ -1,12 +1,12 @@
-def _init_or_not(self, label: str, index: int) -> bool:
+def _init_or_not(self, label: str, index: int | tuple[int, ...]) -> bool:
     self._get_target_frame(["switch_var", "alter_var"]) # Will change it after beta 
 
     self._check_exist_label(label)  
-    self._compare_value_counts(label, index)
+    self._compare_value_counts(label, index, allow_tuple=True)
 
     if (
-        self._var_refs[label][index] is None 
-        or self._is_new_var(label, index)
+        self._var_refs[label][index[0]] is None 
+        or self._is_new_var(label, index[0])
     ):  
         # Initial process to store argument variables 
         self._trace_func_call()
