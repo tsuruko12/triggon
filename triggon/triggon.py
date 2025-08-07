@@ -74,8 +74,9 @@ class Triggon:
       self._lineno = None
       self._frame = None
 
-      change_list = _handle_arg_types(label, new)
-      self._scan_dict(change_list)
+      # Error-checked and converted to a dict
+      changed_items = _handle_arg_types(label, new)
+      self._scan_dict(changed_items)
 
     def _scan_dict(self, arg_dict: dict[str, Any]) -> None:      
       for key, value in arg_dict.items():          
@@ -116,13 +117,18 @@ class Triggon:
       self._var_refs[label] = [None] * length
 
     def set_trigger(
-        self, label: str | list[str] | tuple[str, ...], /, 
-        *, cond: str = None, after: int | float = None,
+        self, 
+        label: str | list[str] | tuple[str, ...], 
+        /, 
+        *, 
+        index: int | tuple[int, ...] = None, 
+        cond: str = None, 
+        after: int | float = None,
     ) -> None:
       """
       Activates the trigger flag for the given labels.
 
-      If variables were registered via `alter_var()`, 
+      If variables were registered via `switch_var()` or `alter_var()`, 
       their values will be updated when the flag is activated.
 
       If `cond` is provided, it must be a valid comparison expression 
@@ -137,10 +143,10 @@ class Triggon:
       if isinstance(label, (list, tuple)):
         for name in label:
           _check_label_type(name, allow_dict=False)       
-          self._check_label_flag(name, cond, after)
+          self._check_label_flag(name, index, cond, after)
       else:
         _check_label_type(label, allow_dict=False)
-        self._check_label_flag(label, cond, after)
+        self._check_label_flag(label, index, cond, after)
         
       self._clear_frame()
 
@@ -204,7 +210,7 @@ class Triggon:
 
     def switch_var(
           self, label: str | dict[str, Any], var: Any = None, /, 
-          *, index: int = None,
+          *, index: int | tuple[int, ...] = None,
     ) -> None | Any:
         """
         Change the value of variables associated with the given label 
@@ -217,73 +223,59 @@ class Triggon:
         - Class attributes (fields)
         """
 
-        change_list = _handle_arg_types(label, var, index)
-        init_flag = False
+        changed_items = _handle_arg_types(label, var, index)
+        has_looped = False
 
-        if len(change_list) == 1:
-          # When only one label is provided
-          label = next(iter(change_list))
-          name = label.lstrip(SYMBOL)   
+        if index is not None:
+          if isinstance(index, int):
+            i = (index,)
+          elif isinstance(index, range):
+            i = tuple(x for x in index)
+          else:
+            i = index
 
-          if index is None:
-            index = self._count_symbol(label)
-
-          if not init_flag:
-            init_flag = self._init_or_not(name, index)
-
-          trig_flag = self._trigger_flags[name]
-          vars = self._var_refs[name][index]
-
-          if not init_flag:
-             return var
-          elif not trig_flag and self._delay_info[name][0] is None:
-            self._clear_frame()
-            return var
-          
-          if self._delay_info[name][0] is not None:   
-              while not self._trigger_flags[name]:
-                sleep(0.001)
-
-          self._update_var_value(
-            vars, name, index, self._new_values[name][index],
-          )      
-          self._clear_frame()
-
-          return var
+        if len(changed_items) == 1:
+          single_key = True
         else:
-           # When multiple labels are provided in a dictionary
+          single_key = False
 
-          if index is not None:
-            raise InvalidArgumentError(
-              "Cannot use the `index` keyword with a dictionary. " 
-              "Use `*` in the label instead." 
-            )
-          
-          for key in change_list.keys():
+        for key, val in changed_items.items():
             name = key.lstrip(SYMBOL)
-            index = self._count_symbol(key)
 
-            if not init_flag:
-              init_flag = self._init_or_not(name, index)
+            if index is None:
+              i = (self._count_symbol(key),)
+
+            if not has_looped:
+              init_flag = self._init_or_not(name, i)
             
-            if not init_flag:
-              continue
+              if not init_flag:
+                if not single_key:
+                  continue
+      
+                self._clear_frame()
+                return val
+              
+            has_looped = True
 
             trig_flag = self._trigger_flags[name]
-            vars = self._var_refs[name][index]  
+            vars = self._var_refs[name][i[0]]  
 
             if not trig_flag and self._delay_info[name][0] is None:
-              continue     
+              if not single_key:
+                continue     
+
+              self._clear_frame()
+              return val
 
             if self._delay_info[name][0] is not None:   
               while not self._trigger_flags[name]:
                 sleep(0.001)
 
             self._update_var_value(
-                vars, name, index, self._new_values[name][index],
+                vars, name, index, self._new_values[name][i[0]],
             )
 
-          self._clear_frame()
+        self._clear_frame()
 
     def revert(
           self, 
