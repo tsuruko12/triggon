@@ -9,8 +9,13 @@ class Triggon:
     ) -> None: ...
 
     def set_trigger(
-        self, label: str | list[str] | tuple[str, ...], /, 
-        *, cond: str = None, after: int | float = None,
+        self, 
+        label: str | list[str] | tuple[str, ...], 
+        /, 
+        *, 
+        index: int | tuple[int, ...] = None, 
+        cond: str = None, 
+        after: int | float = None,
     ) -> None: ...
 
     def alter_literal(
@@ -25,12 +30,12 @@ class Triggon:
 
     def alter_var(
           self, label: str | dict[str, Any], var: Any = None, /, 
-          *, index: int = None,
+          *, index: int | tuple[int, ...] = None,
     ) -> None | Any: ...
 
     def switch_var(
           self, label: str | dict[str, Any], var: Any = None, /, 
-          *, index: int = None,
+          *, index: int | tuple[int, ...] = None,
     ) -> None | Any: ...
 
     def revert(
