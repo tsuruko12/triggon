@@ -37,7 +37,7 @@ def _update_var_value(
         trig_flag = True
         i = 0
   
-    if len(var_ref) == 4:     
+    if len(var_ref) == 4:   
         setattr(var_ref[3], var_ref[2], update_value)
     else:    
         if self._delay_info[label][i] is None:
@@ -57,7 +57,7 @@ def _update_var_value(
 
 def _label_has_var(
     self, label: str, called_func: str, after: int | float, 
-    to_org: bool = False,
+    index: int = None, to_org: bool = False,
 ) -> None:
     if after is None and self._var_refs[label] is None:
         return
@@ -65,7 +65,7 @@ def _label_has_var(
     self._get_target_frame(called_func)   
 
     if after is None:            
-        self._update_all_vars(label, to_org)
+        self._update_all_vars(label, index, to_org)
     else:
         if to_org:
             self._delay_info[label][1] = self._frame
@@ -75,9 +75,13 @@ def _label_has_var(
         if self._var_refs[label] is None:
             return
 
-        Timer(after, self._update_all_vars, args=(label, to_org)).start()
+        Timer(
+            after, self._update_all_vars, args=(label, index, to_org),
+        ).start()
 
-def _update_all_vars(self, label: str, to_org: bool) -> None:
+def _update_all_vars(
+        self, label: str, index: int | None, to_org: bool,
+) -> None:
     if to_org:
         update_value = self._org_values[label]
     else:
@@ -97,6 +101,9 @@ def _update_all_vars(self, label: str, to_org: bool) -> None:
                         var_ref[i_2], label, i, val, i_2, to_org,
                     )
             else:
+                if index is not None:
+                    i = index
+
                 for i_2, val in enumerate(var_ref):
                     self._update_var_value(
                         val, label, i, update_value[i], i_2, to_org,
@@ -107,6 +114,9 @@ def _update_all_vars(self, label: str, to_org: bool) -> None:
                     var_ref, label, i, update_value[i][0], to_org=to_org,
                 )
             else:
+                if index is not None:
+                    i = index
+                    
                 self._update_var_value(
                     var_ref, label, i, update_value[i], to_org=to_org,
                 )
