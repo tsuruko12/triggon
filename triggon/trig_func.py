@@ -1,41 +1,64 @@
+import builtins
 import inspect
 from typing import Any, Callable
+
+from ._internal._exceptions import InvalidArgumentError
+from ._internal._sentinel import _NO_VALUE
 
 
 class TrigFunc:
   """
-  `trigger_return()` と `trigger_func()`を使う際に、
-  引数に入れる関数の実行を遅延させます。
- 
-  対象関数を包んで引数に渡してください。
- 
-  必ずクラスインスタンス変数を作成してから使ってください。
-  (例： F = TrigFunc()) 
+  関数を即時に実行せずに呼び出します。
+
+  パフォーマンスを向上させるため、
+  対象の関数を呼び出す前にインスタンスを作成して変数に代入してください。
+
+  Triggonクラスの関数で正常に機能させるためには、
+  対象の関数を呼び出す際に必ず '()' を付けてください（例: F = TrigFunc(), F.test())。
   """
 
-  _func: Callable | None
+  _func: Any | object
 
-  def __init__(self, func: Callable=None) -> None:
-    self._func = func
+  def __init__(
+      self, _func: Any | object = _NO_VALUE, _chain: bool = False,
+  ) -> None:
+    if _func is not _NO_VALUE and not _chain:
+      raise InvalidArgumentError("引数は渡せません。")
 
-  def __call__(self, *args, **kwargs) -> "TrigFunc":
-    if self._func is None:
-      raise ValueError("`func` is None")
+  def __call__(self, *args: Any, **kwargs: Any) -> "TrigFunc":
+    if self._func is _NO_VALUE:
+      raise TypeError("関数が渡されていません。")
+    return TrigFunc(self._func(*args, **kwargs), _chain=True)
     
-    return TrigFunc(self._func(*args, **kwargs))
-    
-  def __getattr__(self, name: str) -> Callable[[], Any]:    
-    if self._func is not None:
-      target = getattr(self._func, name)
+  def __getattr__(self, name: str) -> Callable[..., Any] | "TrigFunc":  
+    if self._func is not _NO_VALUE:
+      target = getattr(self._func, name, None)
+      if target is None:
+        target = getattr(builtins, name, None)
     else:
       frame = inspect.currentframe().f_back
-      target = frame.f_locals.get(name) or frame.f_globals.get(name)
+      target = frame.f_locals.get(name)
+
+      if target is None:
+        target = frame.f_globals.get(name)
+        if target is None:
+          target = getattr(builtins, name, None)
+          
+      frame = None
 
     if target is None:
-        raise AttributeError(f"'{name}' is not a callable function")
-    elif not callable(target):
-        return TrigFunc(target)
+        raise AttributeError(f"'{name}' は呼び出し可能の関数ではありません。")
+    if not callable(target):
+        return TrigFunc(target, _chain=True)
       
-    def _wrapper(*args, **kwargs) -> Callable[[], Any]:
-      return lambda: target(*args, **kwargs)
+    def _wrapper(*args: Any, **kwargs: Any) -> Callable[..., Any]:
+      func = lambda: target(*args, **kwargs)
+      func._trigfunc = True # このクラスが使われてるかの確認用
+
+      # デバッグ用
+      func._trigfunc_name = name
+      func._trigfunc_args = args
+      func._trigfunc_kwargs = kwargs
+
+      return func
     return _wrapper
