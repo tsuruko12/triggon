@@ -1,43 +1,57 @@
-from threading import Timer
-
-from ._err_handler import _check_label_type
-from ._exceptions import SYMBOL
+from threading import Lock, Timer
+from typing import Any
 
 
-def _revert_value(
-        self, label: str, disable: bool, after: int | float | None,
+proc_lock = Lock()
+
+
+def _revert_or_skip(
+        self, labels: list[str], disable: bool, 
+        cond: Any, after: int | float | None,
 ) -> None:
-    _check_label_type(label, allow_dict=False)
-
-    name = label.lstrip(SYMBOL)
-    self._check_exist_label(name)
-
-    if self._delay_info[name][1] is not None:
-        return
-    elif not disable and not self._trigger_flags[name]:
-        return
-    elif disable and self._disable_flags[name]:
-        return 
+    target_labels = []
+    for label in labels:
+        if self._delay_info[label][1] is not None:
+            continue
+        if not disable and not self._trigger_flags[label]:
+            continue
+        if disable and self._disable_flags[label]:
+            continue     
+        target_labels.append(label)
+    
+    target_func = "revert"
+    
+    if cond is not None:
+        self._get_target_frame(target_func)
+        if not self._get_cond_result(cond):
+            return
     
     if after is None:
-        self._deactivate_trigger(name, disable)
+        self._deactivate_trigger(target_labels, disable)
+        self._debug_revert(target_labels, after, disable)
+        self._has_var_refs(target_labels, target_func, after, to_org=True)
     else:
-        Timer(after, self._deactivate_trigger, args=(name, disable)).start()
+        update_labels = (
+            self._has_var_refs(target_labels, target_func, after, to_org=True)
+        )
+        self._debug_revert(target_labels, after, disable)
+        Timer(
+            after, self._deactivate_trigger,
+            args=(target_labels, disable, update_labels),
+            kwargs={"delay": True},
+        ).start()
 
-    # for debug
-    if disable:
-        state = "disable"
-    else:
-        state = "inactive"
+def _deactivate_trigger(
+        self, labels: list[str], disable: bool, 
+        update_labels: list[str] = None, delay: bool = False,
+) -> None:
+    with proc_lock:
+        for label in labels:
+            self._trigger_flags[label] = False
+            if disable:
+                self._disable_flags[label] = True
 
-    self._label_has_var(name, "revert", after, to_org=True)
-
-    if self.debug:
-        self._get_target_frame("revert")
-        self._print_flag_debug(name, state) 
-
-def _deactivate_trigger(self, label: str, disable: bool) -> None:
-    self._trigger_flags[label] = False
-
-    if disable:
-        self._disable_flags[label] = True
+        if delay:
+            self._debug_revert(labels, None, disable, delay=True)
+            if update_labels is not None:
+                self._update_all_vars(update_labels, None, to_org=True)
