@@ -2,48 +2,49 @@ from types import FrameType
 from typing import Any
 
 from .trig_func import TrigFunc
-from ._internal import (
-  _debug,
-  _err_handler,
-  _var_analysis,
-  _var_update,
-  _switch_var,
-)
 from ._internal._err_handler import (
-  _check_label_type,
-  _handle_arg_types, 
+    _count_symbol,
+    _ensure_after_type,
+    _ensure_index_type,
+    _ensure_label_type,
+    _ensure_var_type,
+    _normalize_arg_types, 
 )
 from ._internal._exceptions import (
-  InvalidArgumentError,
+  InvalidArgumentError, 
   SYMBOL,
   _ExitEarly,
 )
-from ._internal._sentinel import _no_value
+from ._internal._methods import _bind_to_triggon
+from ._internal._sentinel import _NO_VALUE
+from ._internal._var_update import _is_delayed_func
 
 
 class Triggon:
     debug: bool
-    _debug_var: dict[str, tuple[int, str] | list[tuple[int, str]]]
-    _trigger_flag: dict[str, bool]
-    _new_value: dict[str, tuple[Any, ...]]
-    _org_value: dict[str, list[Any]]
-    _var_list: dict[str, tuple[str, ...] | list[tuple[str, ...]]]
-    _disable_label: dict[str, bool]
-    _return_value: tuple[bool, Any] | None
+    _trigger_flags: dict[str, bool]
+    _new_values: dict[str, tuple[Any, ...]]
+    _org_values: dict[str, list[Any]]
+    _var_refs: dict[str, tuple[str, ...] | list[tuple[str, ...]]]
+    _delay_info: dict[str, str]
+    _disable_flags: dict[str, bool]
+    _return_values: tuple[bool, Any] | None
     _file_name: str
     _lineno: int
     _frame: FrameType
 
-    # `new_value`: 各ラベルはタプルで統一されてる
-    # `org_value`: 各ラベルのインデックスには、リストの中に値が入っている。
+    # new_values: 各ラベルはタプルで統一されてる
+    # org_values: 各ラベルのインデックスには、リストの中に値が入っている。
     #              未設定の場合はNone。
-    # `var_list`: 各ラベルのインデックスには、文字列が入ったタプル、
+    # var_refs: 各ラベルのインデックスには、文字列が入ったタプル、
     #             または複数のそのタプルが入ったリストが入っている。
     #             未設定の場合はNone。
+    # delay_info: 各ラベルは1つまたは2つの遅延用のフレーム情報を持つリストを保持する。
+    #               遅延されていない場合はNone。
 
     def __init__(
-        self, label: str | dict[str, Any], /, new: Any=None, 
-        *, debug: bool=False,
+        self, label: str | dict[str, Any], /, new: Any = None, 
+        *, debug: bool | str | list[str] | tuple[str, ...] = False,
     ) -> None:
       """
       ラベルとその値を登録します。
@@ -52,348 +53,497 @@ class Triggon:
       配列を１つの値として設定したい場合は、さらに別の配列に入れてください。
 
       対応形式:
-      - label, value
-      - label, [value]
-      - label, (value,)
-      - {label: value}
-      - {label: [value]}
-      - {label: (value,)}
+          - label, value
+          - label, [value]
+          - label, (value,)
+          - {label: value}
+          - {label: [value]}
+          - {label: (value,)}
+
+      Keyword Args:
+          debug:
+              Trueに設定した場合、ラベルのトレースをリアルタイムで出力します。 
+              ラベル名が渡された場合は、そのラベルのみを出力します。
       """
 
-      self.debug = debug
-      self._trigger_flag = {}
-      self._new_value = {}
-      self._org_value = {}
-      self._var_list = {}  
-      self._disable_label = {}   
-      self._return_value = None
+      self._trigger_flags = {}
+      self._new_values = {}
+      self._org_values = {}
+      self._var_refs = {}  
+      self._delay_info = {}
+      self._disable_flags = {}   
+      self._return_values = None
       self._file_name = None
       self._lineno = None
       self._frame = None
 
-      change_list = _handle_arg_types(label, new)
-      self._scan_dict(change_list)
+      changed_items = _normalize_arg_types(label, new)
+      self._scan_dict(changed_items)
 
     def _scan_dict(self, arg_dict: dict[str, Any]) -> None:      
       for key, value in arg_dict.items():          
-          index = self._count_symbol(key)
+          index = _count_symbol(key)
 
           if index != 0:
               raise InvalidArgumentError(
-                  f" `{key}`の先頭にある `*` をすべて取り除いてください。 "
-                  "インデックスを指定するためには, "
+                  f" '{key}' の先頭にある '*' をすべて取り除いてください。"
+                  "インデックスを指定するためには、 "
                   "リスト/タプル内に任意のインデックスの位置に値を配置してください。"
               )
-
+  
           self._add_new_label(key, value)
 
-    def _add_new_label(self, label: str, value: Any, /) -> None:
-      # 値はタプルで統一させる
+      if not isinstance(self.debug, bool):
+        self._ensure_debug_type()
+
+    def _add_new_label(self, label: str, value: Any) -> None:
+      # タプルで統一
       if isinstance(value, (list, tuple)):
         length = len(value)
-
         if length == 0:
           # 空の配列は単一の値として扱う
           length = 1
-          self._new_value[label] = (value,)
+          self._new_values[label] = (value,)
         else:
-          self._new_value[label] = tuple(value)
+          self._new_values[label] = tuple(value)
       else:
         length = 1
-        self._new_value[label] = (value,)
+        self._new_values[label] = (value,)
 
-      self._trigger_flag[label] = False
-      self._disable_label[label] = False
+      self._trigger_flags[label] = False
+      self._disable_flags[label] = False
+      # 遅延トリガー用の [発動frame_info, 解除frame_info]。遅延なしならNone
+      self._delay_info[label] = [None, None]
         
-      self._trigger_flag[label] = False
-      self._disable_label[label] = False
-
-      # 送られた値のインデックスの数だけ`None`を設定する
-      # (`length`は必ず１以上になる)
-      self._org_value[label] = [None] * length
-      self._var_list[label] = [None] * length
+      # 送られた値のインデックスの数だけNoneを設定する
+      # (lengthは必ず１以上になる)
+      self._org_values[label] = [None] * length
+      self._var_refs[label] = [None] * length
 
     def set_trigger(
-        self, label: str | list[str] | tuple[str, ...], /, *, cond: str=None,
+        self, 
+        label: str | list[str] | tuple[str, ...] = None, 
+        /, 
+        *, 
+        all: bool = False,
+        index: int = None, 
+        cond: str = None, 
+        after: int | float = None,
     ) -> None:
       """
-      引数のラベルのフラグをTrueに設定します。
- 
-      `alter_var()`によって変数が登録されてる場合, 
-      この関数内で値が更新されます。
+      ラベルを有効化にします。
 
-      キーワード引数の`cond`には比較文を設定できます。
-      （例： `"x > 10"`, `"obj.count == 5"`)
-      結果がTrueの場合にラベルのフラグをTrueに設定します。
+      switch_var()によって変数が登録されている場合のみ、
+      値の切り替えが行われます。
+
+      Keyword Args:
+          all:
+              全てのラベルを有効化にします。
+
+          index:
+              指定されている全てのラベルのインデックス値を設定します。
+
+              Note:
+                  変数がすでにswitch_var()で登録されている場合にのみ適用されます。
+                  switch_lit()の場合は適用されません。
+
+          cond:
+              ラベルを有効にする条件を設定します。
+              有効な比較式である必要があります（例: "x > 10", "obj.count == 5"）。
+              その結果がTrueの場合のみラベルを有効化にします。
+
+          after:
+              ラベルを有効化するまでの遅延時間（秒）を設定します。
+
+              Note:
+                  実行は指定時刻より約0.011秒遅れて行われます。
       """
 
-      if isinstance(label, (list, tuple)):
-        for name in label:
-          _check_label_type(name, allow_dict=False)    
-          self._check_label_flag(name, cond)
-      else:
-        _check_label_type(label, allow_dict=False)
-        self._check_label_flag(label, cond)
+      _ensure_index_type(index)
+      _ensure_after_type(after)
+      if not isinstance(all, bool):
+        raise TypeError("'all' はbool値でなくてはなりません。")  
       
+      if all:
+        labels = self._trigger_flags.keys()
+      else:
+        if label is None:
+          raise TypeError("ラベルを指定してください。")
+        _ensure_label_type(label)
+        
+        if isinstance(label, (list, tuple)):
+          labels = [v.lstrip(SYMBOL) for v in label]
+        else: 
+          labels = [label.lstrip(SYMBOL)]
+
+        self._ensure_label_exists(labels)
+
+      if index is not None:
+          self._compare_value_counts(labels, index)
+
+      self._update_or_skip(labels, index, cond, after) 
       self._clear_frame()
+
+    def is_triggered(
+        self, *label: str,
+    ) -> bool | list[bool] | tuple[bool, ...]:
+      """
+      指定されたラベルが有効状態の場合Trueを返し、そうでない場合はFalseを返します。
+
+      複数のラベルが指定された場合は、入力の型（list または tuple）に合わせて
+      ブール値の配列を返します。
+      """
+
+      _ensure_label_type(label, unpack=True)
+      self._ensure_label_exists(label, unpack=True)
+
+      if isinstance(label[0], list):
+        return [self._trigger_flags[v] for v in label[0]]
+      if isinstance(label[0], tuple):
+        return tuple(self._trigger_flags[v] for v in label[0])
+      if len(label) > 1:
+        return tuple(self._trigger_flags[v] for v in label)
+      return self._trigger_flags[label[0]]
 
     def switch_lit(
         self, label: str | list[str] | tuple[str, ...], /, org: Any, 
-        *, index: int=None,
+        *, index: int = None,
     ) -> Any:
       """
-      引数のラベルのフラグがTrueの場合、その値を変更します。
- 
-      変数以外の式やリテラルのみ対応しています。
+      ラベルが有効の場合、インスタンス作成時に登録した
+      ラベルのインデックスに対応する値に切り替えます。
+
+      また、関数への切り替えにも対応しています。
+      TrigFuncによって遅延されている関数は、実行されその戻り値が返されます。
 
       Note:
-        複数のラベルを渡す際に、同じラベル名が含まれている場合、  
-        `set_trigger()` はインデックスに関係なくラベル単位でフラグを True にするため、  
-        配列内でインデックスが小さい方のラベルが優先されます。 
-        また、異なるラベルで複数のフラグが同時に True になった場合も同様です。
+          複数のラベルが与えられ、かつ複数が有効の場合、
+          配列内でインデックスが小さい方が優先されます。
       """
 
-      cur_functions = ["switch_lit", "alter_literal"] # ベータ後に変更予定
+      self._get_marks(init=True) # デバッグ用
 
-      _check_label_type(label, allow_dict=False)
+      _ensure_label_type(label)
+      _ensure_index_type(index)
 
       if isinstance(label, (list, tuple)):
         for v in label:
           stripped_label = v.lstrip(SYMBOL)
-          self._check_exist_label(stripped_label)
+          self._ensure_label_exists(stripped_label)
 
-          if self._trigger_flag[stripped_label]:
+          if self._trigger_flags[stripped_label]:
             label = v
             break
 
         # トリガーが有効なラベルがなかった場合
         if not isinstance(label, str):
+          self._get_marks(label, index, org, strip=True)
           return org
       
       name = label.lstrip(SYMBOL)
-      self._check_exist_label(name)
+      self._ensure_label_exists(name)
 
       if index is None:
-        index = self._count_symbol(label)
+        index = _count_symbol(label)
       self._compare_value_counts(name, index)
 
-      flag = self._trigger_flag[name]
-
+      flag = self._trigger_flags[name]
       if not flag:
         ret_value = org
-        new_val = _no_value # デバッグ用
+        self._get_marks(name, index, org)
       else:
-        ret_value = self._new_value[name][index] 
-        new_val = self._new_value[name][index] # デバッグ用
-
-      if self.debug:
-        self._get_target_frame(cur_functions)
-        self._print_val_debug(name, index, flag, org, new_val)
-
+        ret_value = self._new_values[name][index] 
+        self._get_marks(name, index, org, ret_value)
+    
+      if _is_delayed_func(ret_value):
+          return ret_value()
       return ret_value
 
     def switch_var(
-          self, label: str | dict[str, Any], var: Any=None, /, 
-          *, index: int=None,
-    ) -> None | Any:
+          self, label: str | dict[str, Any], var: Any = None, /, 
+          *, index: int = None,
+    ) -> Any:
         """
-        引数のラベルのフラグがTrueの場合、
-        その変数の値を変更します。
+        指定されたラベルのインデックに変数の登録を行います。
+
+        最初の登録、かつラベルのいずれかが有効な場合に、
+        その変数の値をインスタンス作成時に登録された値に変更します。
  
-        変数のみ対応しています。（式やリテラル以外）
- 
-        対応変数の種類:
-        - グローバル変数
-        - クラス変数
+        式やリテラル以外の変数のみに対応しています。
+
+        Returns:
+            単一のラベルが渡された場合に、与えられた変数の値を返します。
+            それ以外は、Noneを返します。
+
+            値がTrigFuncによる遅延関数だった場合は、実行しその戻り値を返します。
         """
 
-        change_list = _handle_arg_types(label, var, index)
-        init_flag = False
+        # 複数のインデックスが渡せる用に実装されてますが、
+        # 実際には使い道がないためエラーになります
 
-        if len(change_list) == 1:
-          # 単一のラベルの場合
-          label = next(iter(change_list))
-          name = label.lstrip(SYMBOL)     
+        changed_items = _normalize_arg_types(label, var, index)
+        has_looped = False
 
-          if index is None:
-            index = self._count_symbol(label)
+        # タプルに統一
+        if index is not None:
+          if isinstance(index, int):
+            i = (index,)
+          elif isinstance(index, range):
+            i = tuple(index)
+          else:
+            i = index
 
-          if not init_flag:
-            init_flag = self._init_or_not(name, index)
-
-          trig_flag = self._trigger_flag[name]
-          vars = self._var_list[name][index]
-
-          if not trig_flag:
-            self._clear_frame()
-            return var
-          elif not init_flag:
-             return var
-          
-          self._update_var_value(
-            vars, name, index, self._new_value[name][index],
-          )     
-          self._clear_frame()
-
-          return var
+        if len(changed_items) == 1:
+          single_key = True
         else:
-           # 複数のラベルの場合（辞書）
-          if index is not None:
-            raise InvalidArgumentError(
-              "`dict`で渡す場合は、`index`引数は使用できません。" 
-              "代わりに`*`を使用してください。" 
-            )
-          
-          for key in change_list.keys():
+          single_key = False
+
+        for key, value in changed_items.items():
             name = key.lstrip(SYMBOL)
-            index = self._count_symbol(key)
 
-            if not init_flag:
-              self._check_exist_label(name)
-              self._compare_value_counts(name, index)
+            if index is None:
+              i = (_count_symbol(key),)
 
-            if not init_flag:
-              init_flag = self._init_or_not(name, index)
-            
-            if not init_flag:
-              continue
+            if not has_looped:
+              init_flag = self._init_or_not(name, i)        
+              if not init_flag:
+                if not single_key:
+                  continue
+                self._clear_frame()
 
-            trig_flag = self._trigger_flag[name]
-            vars = self._var_list[name][index]  
+                if _is_delayed_func(value):
+                  return value()                
+                return value
+              
+            has_looped = True
 
-            if not trig_flag:
-              continue          
+            trig_flag = self._trigger_flags[name]
+            var_ref = self._var_refs[name][i[0]]  
 
-            self._update_var_value(
-              vars, name, index, self._new_value[name][index],
-            )
-            
-          self._clear_frame()
+            if not trig_flag and self._delay_info[name][0] is None:
+              if not single_key:
+                continue     
 
+              self._clear_frame()
+
+              if _is_delayed_func(value):
+                return value()    
+              return value
+
+            if self._delay_info[name][0] is None:   
+              if isinstance(var_ref, list):
+                  for v in var_ref:
+                      self._update_var_value(
+                          v, label, i[0], self._new_values[name][i[0]],
+                      )
+              else:
+                  self._update_var_value(
+                      var_ref, label, i[0], self._new_values[name][i[0]],
+                  )
+              ret_value = self._new_values[name][i[0]]
+            else:
+              ret_value = value
+
+            if single_key:
+              self._clear_frame()
+
+              if _is_delayed_func(ret_value):
+                return ret_value()
+              return ret_value
+
+        self._clear_frame()
+
+    def is_registered(
+        self, *variable: str,
+    ) -> bool | list[bool] | tuple[bool, ...]:
+      """
+      指定された変数が登録済みの場合Trueを返し、そうでない場合はFalseを返します。
+
+      複数のラベルが指定された場合は、入力の型（list または tuple）に合わせて
+      ブール値の配列を返します。
+      """
+
+      vars = _ensure_var_type(variable)
+      self._get_target_frame("is_registered")
+
+      result = []
+      for var in vars:
+        is_glob = False
+        if "." in var:
+          (left, right) = var.split(".")
+
+          class_inst = self._frame.f_locals.get(left)
+          if class_inst is None:
+              glob_inst = self._frame.f_globals.get(left)
+              if glob_inst is None:
+                result.append(False)
+                continue
+              is_glob = True
+              class_inst = glob_inst.__name__
+          elif isinstance(class_inst, type):
+            is_glob = True
+            class_inst = class_inst.__name__
+          result.append(
+            self._check_var_refs(class_inst, right, is_glob)
+          )
+        else:
+          try:
+            self._frame.f_globals[var]
+          except KeyError:
+            result.append(False)
+          else:
+            result.append(self._check_var_refs(var)) 
+
+      self._clear_frame()
+
+      if len(result) == 1:
+        return result[0]
+      return result
 
     def revert(
-          self, label: str | list[str] | tuple[str, ...]=None, /, 
-          *, all: bool=False, disable: bool=False,
+          self, 
+          label: str | list[str] | tuple[str, ...] = None, 
+          /, 
+          *, 
+          all: bool = False, 
+          disable: bool = False,
+          cond: str = None, 
+          after: int | float = None,
     ) -> None:
       """
-      `set_trigger()`によってTrueにされたフラグを、Falseに戻します。
+      ラベルを無効化にします。
 
-      一括で全てのラベルのフラグを無効にしたい場合は、`all`引数をTrueに設定してください。
-      `disable`がTrueに設定された場合、永続的にフラグを無効化します。
+      Keyword Args:
+          all:
+              全てのラベルを無効化にします。
+
+          disable:
+              永続的にラベルを無効化にします。
+              この状態のラベルは、set_trigger()で無視されます。
+
+          cond:
+              ラベルを無効にする条件を設定します。
+              有効な比較式である必要があります（例: "x > 10", "obj.count == 5"）。
+              その結果がTrueの場合のみラベルを無効化にします。
+
+          after:
+              ラベルを無効化するまでの遅延時間（秒）をで設定します。
+
+              Note:
+                  実行は指定時刻より約0.011秒遅れて行われます。
       """
-      
-      if label is None:
-        if not all:
-          raise InvalidArgumentError("引数にラベルを設定してください。")
 
-        for key in self._new_value.keys():
-          self._revert_label(key, disable)      
-      elif isinstance(label, (list, tuple)):
-        for name in label:
-          self._revert_label(name, disable)
+      _ensure_after_type(after)
+      if not isinstance(disable, bool):
+        raise TypeError("'disable' はbool値でなくてはなりません。")
+      if not isinstance(all, bool):
+        raise TypeError("'all' はbool値でなくてはなりません。")
+
+      if all:
+        labels = tuple(self._trigger_flags.keys())
       else:
-        self._revert_label(label, disable)  
+        if label is None:
+          raise InvalidArgumentError("ラベルを指定してください。")
+        _ensure_label_type(label)
 
-      self._clear_frame()      
+        if isinstance(label, (list, tuple)):
+          labels = [v.lstrip(SYMBOL) for v in label]
+        else:
+          labels = [label.lstrip(SYMBOL)]
 
-    def _revert_label(self, label: str, disable: bool) -> None:
-      _check_label_type(label, allow_dict=False)
+        self._ensure_label_exists(labels)
 
-      name = label.lstrip(SYMBOL)
-      self._check_exist_label(name)
-
-      if not self._trigger_flag[name]:
-        return
-
-      if disable:
-        state = "disable" # デバッグ用
-        self._disable_label[name] = True
-      else:
-        state = "inactive" # デバッグ用
-      self._trigger_flag[name] = False
-
-      self._label_has_var(name, "revert", to_org=True)
-
-      if self.debug:
-        self._get_target_frame("revert")
-        self._print_flag_debug(name, state)    
+      self._revert_or_skip(labels, disable, cond, after)  
+      self._clear_frame()
     
-    def exit_point(self, label: str, func: TrigFunc, /) -> None | Any:
+    def exit_point(self, func: TrigFunc) -> Any:
       """
-      引数と同じラベルの`trigger_return()`によって実行された早期リターンは、
-      `func`に渡された関数のところまで処理が戻ります。
+      trigger_return()によって実行された早期リターンを、
+      `func` に渡された関数のところまで処理を戻します。
+
+      Returns:
+          trigger_return()の戻り値を返します。
       """
 
-      name = label.lstrip(SYMBOL)
-      self._check_exist_label(name)
+      if not _is_delayed_func(func):
+        raise TypeError(
+          "'func' はTriguFuncインスタンスでラップされた関数である必要があります。"
+        )
 
       try:
           return func()
       except _ExitEarly:
-          if not self._return_value[0]:
-              return self._return_value[1]
-          
-          print(self._return_value[1])
+          if _is_delayed_func(self._return_values):
+              return self._return_values()     
+          return self._return_values
 
     def trigger_return(
-        self, label: str, /, *, index: int=None, do_print: bool=False,
-    ) -> None | Any:
+        self, label: str | list[str] | tuple[str, ...], /, 
+        ret: Any = _NO_VALUE, *, index: int = None,
+    ) -> Any:
         """
-        引数のラベルのフラグがTrueの場合、
-        早期リターンを実行と共に設定された値を返します。
- 
-        `do_print`がTrueの場合、早期リターンで設定された値を出力します。
-        値が文字列でない場合、`InvalidArgumentError`が発生します。
+        ラベルが有効の場合、早期リターンを実行と共に
+        クラスインスタンス作成時に設定された値を返します。
+
+        Returns:
+            クラスインスタンス作成時に設定された値を返します。
+            'ret' に値が渡された場合は、それが優先されます。
         """
 
-        name = label.lstrip(SYMBOL)
-        self._check_exist_label(name)
+        _ensure_label_type(label)
+        _ensure_index_type(index)
 
-        if index is None:
-           index = self._count_symbol(label)
+        if isinstance(label, str):
+           label = [label]
 
-        if not self._trigger_flag[name]:
-            return 
-            
-        if do_print:
-            if not isinstance(self._new_value[name][index], str):
-              raise InvalidArgumentError(
-                 "値は文字列である必要がありますが、"
-                 f"`{type(self._new_value[name][index]).__name__}`が渡されました。"
-              )         
-        self._return_value = (do_print, self._new_value[name][index])
+        for v in label:
+          name = v.lstrip(SYMBOL)
+          self._ensure_label_exists(name)
 
-        if self.debug:
-          self._get_target_frame("trigger_return")
-          self._print_trig_debug(name, "Return")
+          if index is None:
+            index = _count_symbol(label)
+          self._compare_value_counts(name, index)
 
-        self._get_target_frame("exit_point", has_exit=True)
+          if not self._trigger_flags[name]:
+              return 
 
-        raise _ExitEarly 
+          if ret is _NO_VALUE:
+            ret_value = self._new_values[name][index]
+          else:
+            ret_value = ret                  
+          self._return_values = ret_value
+
+          self._get_target_frame("exit_point", has_exit=True)
+          self._debug_trig_return(name)
+
+          raise _ExitEarly 
         
-    def trigger_func(self, label: str, func: TrigFunc, /) -> None | Any:
+    def trigger_func(
+        self, label: str | list[str] | tuple[str, ...], /, func: TrigFunc,
+    ) -> Any:
         """
-        引数のラベルのフラグがTrueの場合、`func`に渡された関数を実行します。
+        ラベルのいずれかが有効の場合、'func' に渡された関数を実行します。
+
+        Returns:
+            指定された関数の戻り値を返します。
         """
 
-        name = label.lstrip(SYMBOL)
-        self._check_exist_label(name)
+        if not _is_delayed_func(func):
+          raise TypeError(
+            "'func' はTriguFuncインスタンスでラップされた関数である必要があります。"
+          )
+        _ensure_label_type(label)
 
-        if self._trigger_flag[name]:
-            if self.debug:
-              self._get_target_frame("trigger_func")
-              self._print_trig_debug(name, "Trigger a function") 
-                    
-            return func()
+        if isinstance(label, str):
+           label = [label]
 
-    # 旧関数
-    alter_literal = switch_lit
-    alter_var = switch_var
+        for v in label:
+          name = v.lstrip(SYMBOL)
+          self._ensure_label_exists(name)
+
+          if self._trigger_flags[name]:
+              self._debug_trig_func(name, func)              
+              return func()
 
 
-modules = [_debug, _err_handler, _var_analysis, _var_update, _switch_var]
-
-for module in modules:
-  for name, func in vars(module).items():
-      if callable(func):
-          setattr(Triggon, name, func)
+_bind_to_triggon(Triggon)
