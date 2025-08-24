@@ -4,14 +4,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "triggon"
-version = "0.1.0b4"
+version = "1.0.0"
 description = "Automatically switches values at labeled trigger points, supporting multi-value switching, early returns, and function calls."
 readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.13" 
 license = {file = "LICENSE"}
 keywords = [
-  "switch", "trigger", "label", "auto", "dynamic", 
-  "early return", "function call"
+  "switch", 
+  "trigger", 
+  "auto", 
+  "dynamic", 
+  "delay",
+  "early return", 
+  "function call",
 ]
 classifiers = [
     "Programming Language :: Python :: 3.12",
