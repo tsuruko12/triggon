@@ -6,14 +6,7 @@
 ![Package Size](https://img.shields.io/badge/size-25.1kB-lightgrey)
 
 # 概要
-特定のトリガーポイントで単体または複数の値を動的に切り替えるライブラリです。
-
-> ⚠️ **このライブラリは現在ベータ版です。  
-> バグが存在する可能性や、将来的にAPIが変更される可能性があります。**
-
-> ⚠️ 次回のアップデートで、`alter_var()`および`alter_literal()`の関数名は、  
-> それぞれ `switch_var()` および `switch_lit()` に変更されました。  
-> ベータ期間中は互換性のため、従来の関数名も引き続き使用可能です。
+特定のトリガーポイントで単体または複数の値や関数を動的に切り替えるライブラリです。
 
 ## 目次
 - [インストール方法](#インストール方法)
@@ -22,17 +15,11 @@
 - [開発者](#開発者)
 
 ## 特徴
-- 単一のトリガーポイントで複数の値をまとめて切り替え可能
+- 単一のトリガーポイントで複数の値や関数をまとめて切り替え可能
 - if や match 文は不要
 - リテラル値・変数の両方を切り替え可能
 - 任意の戻り値付きで早期リターンが可能
 - トリガー時に他の関数へ自動ジャンプ可能
-
-## 計画中の追加機能
-- 値や関数以外のコードの動きも切り替えられるようにしたいと考えています
-
-## 追加予定の機能
-- タイマーによる遅延トリガー制御のサポート
 
 ## インストール方法
 ```bash
@@ -40,10 +27,27 @@ pip install triggon
 ```
 
 ## 使い方
-このセクションでは、各関数の使い方を説明します。
+このセクションでは、API の使い方を説明します。
+
+## API Reference
+- [Triggon](#triggon)
+  - [set_trigger](#set_trigger)
+  - [is_triggered](#is_triggered)
+  - [switch_lit](#switch_lit)
+  - [switch_var](#switch_var)
+  - [is_registered](#is_registered)
+  - [revert](#revert)
+  - [exit_point](#exit_point)
+  - [trigger_return](#trigger_return)
+  - [trigger_func](#trigger_func)
+- [TrigFunc](#trigfunc)
+- [Erorr](#error)
+  - [InvalidArgumentError](#invalidargumenterror)
+  - [MissingLabelError](#missinglabelerror)
 
 ### Triggon
-`Triggon(self, label: str | dict[str, Any], /, new: Any=None, *, debug: bool=False)`
+`self, label: str | dict[str, Any], /, new: Any = None,`  
+`*, debug: bool | str | list[str] | tuple[str, ...] = False`
 
 `Triggon()` はラベルと値のペアで初期化されます。  
 単一のラベルとその値、または辞書で複数のラベルを渡すことが可能です。
@@ -78,7 +82,7 @@ example()
 ```python
 tg = Triggon({
     "seq1": [(1, 2, 3)], # インデックス0に (1, 2, 3)
-    "seq2": [1, 2, 3],   # インデックス0, 1, 2に1, 2, 3 を設定
+    "seq2": [1, 2, 3],   # インデックス0, 1, 2に1, 2, 3を設定
 })
 
 def example():
@@ -103,7 +107,7 @@ from dataclasses import dataclass
 
 from triggon import Triggon
 
-tg = Triggon("mode", new=True) # 'mode' ラベルのインデックス0に True を設定
+tg = Triggon("mode", new=True) # "mode"ラベルのインデックス0にTrueを設定
 
 @dataclass
 class ModeFlags:
@@ -137,59 +141,99 @@ s.set_mode(True)
 # mode_c is True
 ```
 
-ラベルの状態をリアルタイムで追跡したい場合は、`debug` キーワードに `True` を指定してください。　
-
-> ⚠️ **Note:** 
-`*` プレフィックス付きのラベルは初期化時には使用できず、`InvalidArgumentError` が発生します。　
-
-### set_trigger
-`def set_trigger(self, label: str | list[str] | tuple[str, ...], /, *, cond: str=None) -> None`
-
-指定したラベルにトリガーを設定し、次回の呼び出しで値が更新されるようにします。  
-インデックスに関係なく、そのラベルに関連付けられたすべての値が変更されます。  
-`label` 引数には、文字列またはラベル名のリスト／タプルを渡すことができます。 
-
-キーワード引数 `cond` には比較式による条件を設定できますが、`if` などの制御構文は使用できません。
-
-なお、`revert()` を使って無効化されたラベルに対しては、フラグは変更されません。
+ラベルの状態をリアルタイムで追跡したい場合は、`debug` フラグを `True` を指定してください。　 
+デバッグ出力したいラベルを単体、またはそれを含めたタプル/リストで渡すことで、  
+出力をソートすることができます。
 
 ```python
+Triggon({"A": 10, "B": 20}, debug=True)       # "A"と"B"両方出力
+
+Triggon({"A": 10, "B": 20}, debug="A")        # "A"のみ出力
+
+Triggon({"A": 10, "B": 20}, debug=("A", "B")) # 出力なし
+```
+
+> ⚠️ **Note:** 
+> `*` プレフィックス付きのラベルは初期化時には使用できず、`InvalidArgumentError` が発生します。　
+
+### set_trigger
+`self, label: str | list[str] | tuple[str, ...], /,`  
+`*,`  
+`all: bool = False,`  
+`index: int = None,`  
+`cond: str = None,`  
+`after: int | float = None`  
+`-> None`
+
+指定されたラベルを有効化します。
+`switch_var()` によって変数が登録済みの場合は、この関数内で変数値を切り替えます。
+
+`revert()` で `disable=True` に設定されてる場合、そのラベルは有効化されません。
+
+#### all
+`True` に設定すると、すべてのラベルを有効にします。
+
+#### index
+値を切り替える際のラベルのインデックス値を指定します。  
+指定されてない場合は、`switch_var()` で指定されたインデックスが使用されます。  
+
+これは `switch_var()` にのみ適用され、`switch_lit()` には適用されません。
+
+#### cond
+ラベルを有効にする条件を設定します。
+
+> **⚠️ Note:**  
+> この引数の処理には内部的に `eval()` を使用します。  
+> **比較式のみ許可**されています（例: `x > 0 > y`, `value == 10`）。  
+> 単体のリテラル値、または変数が渡された場合、  
+> 値が `ブール値` 以外の時 `InvalidArgumentError` が発生します。  
+> 関数呼び出しの場合も同様です。
+
+#### after
+ラベルを有効化するまでの遅延時間を秒数で指定します。  
+遅延中に再度指定された場合は上書きされずに、最初の秒数が維持されます。
+
+> **⚠️ Note:**  
+> 実際の実行は、指定した時間より **およそ 0.011 秒後** に行われます。
+
+```python
+import random
+
 from triggon import Triggon
 
 tg = Triggon({
-    "milk": 130,
-    "banana": 90,
-    "msg": "本日は牛乳の特売日です！",
+    "timeout": None, 
+    "mark": ("〇", "✖"), 
+    "add": (1, 0),
 })
 
-def example():
-    msg = tg.switch_lit("msg", org="本日は通常通りの営業です。")
-    print(msg)
+mark = None
+point = None
+correct = 0
+tg.switch_var({"mark": mark, "add": point}) # 変数を登録
 
-    milk = tg.switch_lit('milk', 200)
-    banana = tg.switch_lit('banana', 120)
+print("10秒間で何問正解できる？")
+tg.set_trigger("timeout", after=10) # 10秒後にラベル"timeout"を有効にする
 
-    print(f"牛乳: {milk}円")
-    print(f"バナナ: {banana}円")
+for _ in range(15):
+    x = random.randint(1, 10)
+    y = random.randint(1, 10)
 
-example()
-# == 出力 ==
-# 本日は通常通りの営業です。
-# 牛乳: 200円
-# バナナ: 120円
+    answer = int(input(f"{x} × {y} = ") or 0)
+    tg.set_trigger(("mark", "add"), cond="answer == x*y")          # "mark" -> "〇", "add" -> 1
+    tg.set_trigger(("mark", "add"), index=1, cond="answer != x*y") # "mark" -> "✖", "add" -> 0
+    print(mark)
 
-tg.set_trigger(["milk", "msg"]) # 'milk'と'msg'にトリガーを設定
+    correct += point
 
-example()
-# == 出力 ==
-# 本日は牛乳の特売日です！
-# 牛乳: 130円
-# バナナ: 120円
+    if tg.is_triggered("timeout"): # ラベル"timeout"が有効にされてるか確認
+        print("タイムアップ！")
+        print(f"{correct}問正解！")
+        break
 ```
 
-
 ```python
-tg = Triggon("msg", "呼びましたか？")
+tg = Triggon("msg", new="呼びましたか？")
 
 def sample(print_msg: bool):
     # print_msgがTrueの場合に"msg"のフラグを有効にする
@@ -198,51 +242,71 @@ def sample(print_msg: bool):
     # "msg"フラグが有効な場合、テキストを出力する
     print(tg.switch_lit("msg", ""))
 
-sample(False) # Output:
+sample(False) # Output: ""
 sample(True)  # Output: 呼びましたか？ 
 ```
 
-> ⚠️ **Note:** 
-この関数では内部で`eval()`を使用しています。
-ただし、比較式（例: `x > 0 > y`, `value == 10`）のみが許可されており、
-それ以外の式が指定された場合は`InvalidArgumentError`が発生します。
+### is_triggered
+`self, label: str | list[str] | tuple[str, ...]`  
+`-> bool | list[bool] | tuple[bool, ...]`
 
-### switch_lit (alter_literal)
-`def switch_lit(self, label: str | list[str] | tuple[str, ...], /, org: Any, *, index: int=None) -> Any`
-
-ラベルのフラグが有効の場合、リテラル値を変更します。    
-この関数は `print()` の中で直接使うこともできます。  　  
-`label` に辞書を使う場合、`index` キーワードは使用できません。
+指定されたラベルごとに、有効かどうかを `True` または `False` で返します。  
+返り値の型は渡された引数によって変わります。
 
 ```python
 from triggon import Triggon
 
-tg = Triggon("text", new="After") 
+tg = Triggon({"A": None, "B": None, "C": None, "D": None})
+
+tg.set_trigger(("A", "D"))
+
+print(tg.is_triggered("A"))                # 出力: True
+print(tg.is_triggered(["C", "D"]))         # 出力: [False, True]
+print(tg.is_triggered("A", "B", "C", "D")) # 出力: (True, False, False, True)
+```
+
+### switch_lit
+`self, label: str | list[str] | tuple[str, ...], /,`  
+`org: Any,`  
+`*, index: int = None`  
+`-> Any`
+
+ラベルが有効な場合に、その値を切り替えます。  
+複数のラベルが渡されていて、そのうち複数が有効な場合は、  
+配列内でインデックスが小さいものが優先されます。
+
+**変数を直接参照することはできません。**
+
+戻り値が `TrigFunc` クラスで遅延実行されてる関数の場合、  
+それを自動的に実行しその戻り値を返します。
+
+複数のラベルに対して `index` キーワードが指定された場合は、  
+全てのラベルに適用されます。
+
+```python
+from triggon import Triggon, TrigFunc
+
+F = TrigFunc() # 関数の遅延実行用ラッパ
+tg = Triggon("text", new=F.print("After")) 
 
 def example():
-    text = tg.switch_lit("text", org="Before", index=0)
-    print(text)  
-
-    # print内に直接書くこともできます:
-    # print(tg.switch_lit('text', 'Before'))
-
-    tg.set_trigger("text")
+    tg.switch_lit("text", org=F.print("Before"))
 
 example() # 出力: Before
+
+tg.set_trigger("text")
 example() # 出力: After
 ```
 
 また、インデックスを指定するために、接頭辞として `*` を使うこともできます。  
 たとえば、`"label"` はインデックス 0 を、`"*label"` はインデックス１を指します。
-
-`index` キーワードと `*` の接頭辞は、どちらも使用可能です。  
-両方が指定されている場合は、キーワード引数の方が優先されます。  
-接頭辞以外の場所で使われた `*` にインデックスとして認識されないので、無視されます。
+接頭辞以外の場所で使われた `*` はインデックスとして認識されないので、無視されます。
+キーワード引数と `*` 両方が指定されている場合は、**キーワード引数の方が優先されます。**  
 
 > **Note:**  複数のインデックスを扱う場合は、可読性のため`index`キーワードの使用を推奨します。
 
 ```python
-# インデックス 0 に 'A' を、インデックス 1 に 'B' を設定
+# インデックス 0 に "A" を、インデックス 1 に "B" を設定
 tg = Triggon("char", new=("A", "B"))
 
 def example():
@@ -280,28 +344,28 @@ tg.set_trigger("B") # Output: True
 sample()
 ```
 
-> **Note:**   
-複数のラベルが渡され、その中で複数のフラグが有効になっていた場合は、  
-配列内でインデックスの早いラベルが優先されます。
-`index`引数が指定されてた場合は、全てのラベルに適用されます。
+### switch_var
+`self, label: str | dict[str, Any], var: Any = None, /,`  
+`*, index: int = None`  
+`-> Any`
 
-### switch_var (alter_var)
-`def switch_var(self, label: str | dict[str, Any], var: Any=None, /, *, index: int=None) -> None | Any`
+指定されたラベルとインデックスで変数を登録します。  
+ラベルが有効の場合、値を切り替えます。  
+変数がすでに登録されている場合は、値の切り替えは `set_trigger()` によって処理されます。  
 
-トリガーが有効な場合、変数の値を直接変更します。  
-**対応しているのはグローバル変数とクラス属性で、ローカル変数には対応していません。**
+**対応しているのはグローバル変数とクラス変数で、ローカル変数には対応していません。**  
+クラス変数をグローバルスコープから登録した場合は `InvalidClassVarError` が発生します。
 
-複数のラベルと変数を辞書形式で渡すこともできます。  
-その場合、`index` キーワードは使用できません。  
-対象インデックスが1以上の場合は、  
-ラベルに対応する接頭辞として `*` を追加してください（例：index 1 → *label、index 2 → **label）。
+単一のラベルで渡された場合のみ引数の値を返し、それ以外は `None` を返します。  
+戻り値が `TrigFunc` クラスで遅延実行されてる関数の場合、  
+それを自動的に実行しその戻り値を返します。
 
-**単一のラベルで渡された場合のみ、引数の値を返します。**  
-辞書型で渡された場合は`None`を返します。
+また、インデックスを指定するために、接頭辞として `*` を使うこともできます。  
+たとえば、`"label"` はインデックス 0 を、`"*label"` はインデックス１を指します。
+接頭辞以外の場所で使われた `*` はインデックスとして認識されないので、無視されます。
+キーワード引数と `*` 両方が指定されている場合は、**キーワード引数の方が優先されます。**  
 
-> **Note:**  
-もしインデックスが大きくなる場合は、  
-個別に関数を呼び出し、`index` キーワードを使って指定することを推奨します。
+複数のラベルにそれぞれ違うインデックスを指定したい場合は、`*` を使ってください。
 
 ```python
 import random
@@ -327,70 +391,45 @@ def spin_gacha():
     tg.switch_var(result, attack, index=1)
 
     # 出力はランダムに変わります。
-    # 例: result = 'level_2'の場合
+    # 例: result = "level_2"の場合
     print(f"{level}ソードを取得しました！") # 出力例: レアソードソードを取得しました！
     print(f"攻撃力: {attack}")    # 出力例: 攻撃力: 100 
 
 spin_gacha()
 ```
 
-```python
-from dataclasses import dataclass
-
-from triggon import Triggon
-
-tg = Triggon("even", [0, 2, 4])
-
-@dataclass
-class Example:
-    a: int = 1
-    b: int = 3
-    c: int = 5
-
-    def change_field_values(self, change: bool):
-        if change:
-            tg.set_trigger("even")
-
-        tg.switch_var({
-            "even": self.a,   # インデックス 0
-            "*even": self.b,  # インデックス 1
-            "**even": self.c, # インデックス 2
-        })
-
-exm = Example()
-
-exm.change_field_values(False)
-print(f"a: {exm.a}, b: {exm.b}, c: {exm.c}")
-# 出力: a: 1, b: 3, c: 5
-
-exm.change_field_values(True)
-print(f"a: {exm.a}, b: {exm.b}, c: {exm.c}")
-# 出力: a: 0, b: 2, c: 4
-```
-
 また、１つの変数に対して複数の設定値に切り替えることも可能です。
 
 ```python
-tg = Triggon({
-    "flag": [True, False],
-    "num": [0, 100],
-})
+import math
 
-@dataclass
-class Sample:
-    flag: bool = None
-    num: int = None
+from triggon import Triggon, TrigFunc
 
-    def sample(self, label: str, label_2: str):
-        tg.switch_var({label: self.flag, label_2: self.num})
+F = TrigFunc()
+tg = Triggon("var", new=["ABC", True, F.math.sqrt(100)])
 
-        print(f"flag: {self.flag}, num: {self.num}")
+x = None
 
-s = Sample()
-tg.set_trigger(["flag", "num"])
+tg.set_trigger("var")
 
-s.sample("flag", "num")   # 出力: flag: True, num: 0
-s.sample("*flag", "*num") # 出力: flag: False, num: 100
+value = tg.switch_var("var", x)
+print(value) # 出力: "ABC"
+
+tg.set_trigger("var", index=1)
+print(x)     # 出力: True
+
+# 返り値が `TrigFunc` によって遅延されてる関数の場合、
+# set_trigger()は自動実行はしません
+tg.set_trigger("var", index=2)
+print(x) # 出力: <function TrigFunc...>
+
+# その場合は、自分で実行必要があります
+if tg.is_triggered("var"):
+    print(x()) # 出力: 10.0
+
+# switch_var()の場合は、自動で実行しその値を返します
+value = tg.switch_var("var", x, index=2)
+print(value) # 出力: 10.0
 ```
 
 > **Notes:**
@@ -399,22 +438,99 @@ s.sample("*flag", "*num") # 出力: flag: False, num: 100
 > その場合、値の変更は `switch_var()` で行われます。  
 > 一度登録されれば、その後の `set_trigger()` 呼び出しで即座に値が更新されます。　
 >
-> 一部の実行環境では、alter_var や switch_var の呼び出しを静的に検出できず、  
+> 一部の実行環境では、`switch_var()` の呼び出しを静的に検出できず、  
 > エラーになることがあります（例：Jupyter、REPLなど）。
 >
-> この関数では、ラベルおよび`index`引数にリテラル値・変数・属性チェーン以外を指定すると、
-> `InvalidArgumentError`が発生します。
+> この関数では、ラベルおよび `index` 引数にリテラル値・変数・属性チェーン以外を指定すると、
+> `InvalidArgumentError` が発生します。
+
+### is_registered
+`self, *variable: str`  
+`-> bool | list[bool] | tuple[bool, ...]`
+
+指定された変数ごとに、登録済みかどうかを `True` または `False` で返します。  
+返り値の型は渡された引数によって変わります。
+
+渡された引数が変数ではない場合、 `InvalidArgumentError` が発生します。
+
+```python
+tg = Triggon("var", None)
+
+@dataclass
+class Sample:
+    x: int = 0
+    y: int = 0
+    z: int = 0
+
+    def func(self):
+        tg.switch_var("var", (self.x, self.z))
+        print(tg.is_registered(["self.y", "self.z"]))
+
+smp = Sample()
+smp.func() # 出力: [False, True]
+
+print(tg.is_registered("smp.x"))                # 出力: True
+print(tg.is_registered("Sample.x", "Sample.y")) # 出力: [True, False]
+```
 
 ### revert
-`def revert(self, label: str | list[str] | tuple[str, ...]=None, /, *, all: bool=False, disable: bool=False) -> None`
+`self, label: str | list[str] | tuple[str, ...] = None, /,`  
+`*,`  
+`all: bool = False,`  
+`disable: bool = False,`  
+`cond: str = None,`  
+`after: int | float = None`  
+`-> None`
 
-`switch_lit()` または `switch_var()` によって変更された値を、元の状態に戻します。  
-全てのラベルの値を一括で戻したい場合は、キーワード引数`all`を`True`に設定してください。
+指定されたラベルを無効化して、元の値に戻します。
 
-この復元状態は、次に `set_trigger()` が呼び出されるまで有効です。  
-指定されたラベルに関連付けられたすべての値が、インデックスに関係なく元に戻されます。
+この状態は、次に `set_trigger()` が呼び出されるまで有効です。  
+指定されたラベルに関連付けられたすべての値が、元に戻されます。
 
-`disable` キーワードを `True` に設定すると、以降元の値が永続的に使用されます。
+#### all
+`True` に設定すると、すべてのラベルを無効にします。
+
+### disable
+`True` に設定すると、すべてのラベルを永続的に無効にします。
+
+この状態のラベルは、`set_trigger()` で有効化されません。
+
+```python
+tg = Triggon("flag", new="有効状態")
+
+def sample():
+    tg.set_trigger("flag") # Activate "flag" on each call
+
+    x = tg.switch_lit("flag", org="無効状態")
+    print(x)
+
+sample() # 出力: 有効状態
+
+# The effect persists until the next call to set_trigger()
+tg.revert("flag")
+sample() # 出力: 有効状態
+
+# Permanently disable "flag"
+tg.revert("flag", disable=True)
+sample() # 出力: 無効状態
+```
+
+#### cond
+ラベルを無効にする条件を設定します。
+
+> **⚠️ Note:**  
+> この引数の処理には内部的に `eval()` を使用します。  
+> **比較式のみ許可**されています（例: `x > 0 > y`, `value == 10`）。  
+> 単体のリテラル値、または変数が渡された場合、  
+> 値が `ブール値` 以外の時 `InvalidArgumentError` が発生します。  
+> 関数呼び出しの場合も同様です。
+
+#### after
+ラベルを無効化するまでの遅延時間を秒数で指定します。  
+遅延中に再度指定された場合は上書きされずに、最初の秒数が維持されます。
+
+> **⚠️ Note:**  
+> 実際の実行は、指定した時間より **およそ 0.011 秒後** に行われます。
 
 ```python
 from dataclasses import dataclass
@@ -446,7 +562,6 @@ class User:
             tg.revert("hi")  # 値を元に戻す
 
 user = User()
-
 user.entry()  # 出力: こんにちは, Guest!
 user.entry()  # 出力: おかえりなさい, Guest!
 ```
@@ -478,98 +593,95 @@ print(f"User name: {user.name}\nOnline: {user.online}")
 ```
 
 ### exit_point
-`def exit_point(self, label: str, func: TrigFunc, /) -> None | Any`
+`self, func: TrigFunc`  
+`-> Any`
 
 `trigger_return()` によって早期リターンで抜ける関数の出口を設定します。  
 `func` 引数には、対象関数をラップした `TrigFunc` インスタンスを渡す必要があります。
 
-`*` プレフィックス付きのインデックスも使用できますが、ここでは無視されます。
-
 > **Note:** `trigger_return()`が実行されない場合は、この関数を使用する必要はありません。
 
 ### trigger_return
-`trigger_return(self, label: str, /, ret: Any=None, *, index: int=None, do_print: bool=False) -> None | Any`
+`self, label: str | list[str] | tuple[str, ...], /,`  
+`ret: Any = ...,`  
+`*, index: int = None`  
+`-> Any`
 
-フラグが有効な場合に、早期リターンを発動させます。  
-返す値は初期化時に設定しておく必要があります。  
-何も返す必要がない場合は、`None` を設定してください。
+指定されたいずれかのラベルが有効な場合に、早期リターンを発動させます。  
+返す値はインスタンス作成時に設定しておく必要があります。  
+戻り値が必要がない場合は、`None` またはラベルのみ渡してください（辞書型でない場合のみ）。
 
-`ret` に値を設定した場合、初期化時に設定された値は無視され、その値が返されます。  
-辞書型でない場合は、値を設定しなくても正常に動作します。
+キーワード引数 `ret` を使って戻り値を設定することもできます。  
+その場合、**初期化時に設定された値は無視され、その値が返されます**。  
+動的に戻り値を設定したい場合に使用してください。 
 
-キーワード引数 `do_print` を `True` にすると、リターン値を出力します。  
-ただし、値が文字列でない場合は `InvalidArgumentError` が発生します。
+戻り値が `TrigFunc` クラスで遅延実行されてる関数の場合、  
+それを自動的に実行しその戻り値を返します。
 
 ```python
 from triggon import Triggon, TrigFunc
 
-# ラベルと早期リターン値の定義
-tg = Triggon("skip", new="（お金が不足しています...）")
-F = TrigFunc() # 対象関数を早期リターン用にラップ
+tg = Triggon("ret", None)
 
-def check_funds(money: int):
-    if money < 300:
-        tg.set_trigger("skip")
+def sample(num):
+    added = num + 5
+    tg.set_trigger("ret", cond="added < 10")
 
-    print(f"現在の所持金：{money}G")
-    board_ship()
+    # 'added'が10より小さい場合、早期リターン
+    tg.trigger_return("ret")
 
-def board_ship():
-    print("船に乗るには300Gかかります。")
+    result = added / 10
+    return result
 
-    # フラグが有効なら、早期リターンを実行し、値を表示
-    tg.trigger_return("skip", do_print=True) 
+F = TrigFunc() # 遅延用の変数
 
-    print("楽しい航海を！")  
+result = tg.exit_point(F.sample(10))
+print(result) # 出力: 1.5
 
-tg.exit_point("skip", F.check_funds(500))
-# == 出力 ==
-# 現在の所持金：500G
-# 船に乗るには300Gかかります。
-# 楽しい航海を！
-
-tg.exit_point("skip", F.check_funds(200))
-# == 出力 ==
-# 現在の所持金：200G
-# 船に乗るには300Gかかります。
-# （お金が不足しています...）
+result = tg.exit_point(F.sample(3))
+print(result) # 出力: None
 ```
 
 ```python
-tg = Triggon("zero")
+tg = Triggon("skip") # 戻り値が必要ない場合はラベルのみ渡しても問題ありません
 F = TrigFunc()
 
-def sample():
-    num = get_number()
+def sample():    
+    # "skip"が有効な場合、指定の関数を呼んで、
+    # 早期リターンと一緒にその戻り値を返す
+    ret_value = tg.trigger_func("skip", F.func())
+    tg.trigger_return("skip", ret=ret_value)
 
-    # `num`が0の場合にラベル"zero"のフラグを有効にする
-    tg.set_trigger("zero", cond="num == 0")
+    print("戻り値なし")
 
-    # テキストを出力して早期リターン
-    tg.trigger_return("zero", ret=f"{num} ...", do_print=True) 
+def func():
+    return "戻り値あり"
 
-    num_2 = get_number()
+value = sample()
+print(value)
+# == 出力 ==
+# 戻り値なし
+# None
 
-    print(f"The total number is {num + num_2}!")
-
-def get_number():
-    return random.randint(0, 10) 
-
-tg.exit_point("zero", F.sample()) # The output is random!
+tg.set_trigger("skip") # "skip"を有効にする
+value = tg.exit_point(F.sample())
+print(value)
+# == 出力 ==
+# 戻り値あり
 ```
 
 ### trigger_func
-`def trigger_func(self, label: str, func: TrigFunc, /) -> None | Any`
+`self, label: str | list[str] | tuple[str, ...], /,`  
+`func: TrigFunc`  
+`-> Any`
 
-フラグが有効の場合に、関数を呼び出します。  
+指定されたいずれかのラベルが有効の場合に、関数を呼び出します。  
 `func` 引数には、対象の関数をラップした `TrigFunc` インスタンスを渡す必要があります。
 
-ラベルは初期設定時に登録しておく必要がありますが、  
-設定した値が返されることはないため、どんな値でも正常に動作します。  
-また、辞書型を使用しない場合は、値を設定する必要はありません。  
+ラベルはインスタンス作成時に登録しておく必要がありますが、  
+設定した値が返されることはないため、どんな値でも正常に動作します。   
+またはラベルのみ渡してください（辞書型でない場合のみ）。  
 **対象の関数が値を返す場合は、その値が返されます。**
-
-ラベルに `*` プレフィックスをつけたインデックスも使用できますが、無視されます。
 
 ```python
 from triggon import Triggon, TrigFunc
@@ -578,47 +690,59 @@ tg = Triggon({
     "skip": None,
     "call": None,
 })
-F = TrigFunc()
 
-def example():
-    tg.set_trigger(["skip", "call"]) # 早期リターンと関数呼び出しのフラグを有効にする
+def func_a():
+    tg.set_trigger(all=True) # 全てのラベルを有効にする
 
-    print("“call”フラグが有効なら、example_2() にジャンプします。")
+    print("'call'フラグが有効なら、func_b()が呼ばれます。")
 
-    tg.trigger_func("call", F.example_2()) # example_2() を呼び出す
+    tg.trigger_func("call", F.func_b())
 
     print("このメッセージは出力されないかも。")
 
 
-def example_2():
-    print("example_2() に到達！")
+def func_b():
+    print("func_b()に到達！")
     tg.trigger_return("skip")
 
-tg.exit_point("skip", F.example())
+F = TrigFunc()
+tg.exit_point("skip", F.func_a())
 # == 出力 ==
-# “call”フラグが有効なら、example_2() にジャンプします。
-# example_2() に到達！
+# 'call'フラグが有効なら、func_b()が呼ばれます。
+# func_b()に到達！
 ```
 
 ### TrigFunc
-このクラスは、関数の実行を遅延させるためのラッパーです。  
-引数なしでインスタンスを作成し、対象の関数をラップして使用できます。
+このクラスは関数の実行を遅延させるために使います。  
+引数なしでインスタンスを作成し、その変数を対象の関数にラップして利用してください。
 
-> ⚠️ **Note:** 
-このクラスを使う際は、必ず先にインスタンス（例：F = TrigFunc()）を作成してから使用してください。
+既存ライブラリのほとんどの関数や自作関数を遅延できますが、  
+インスタンスメソッドには対応していません。
+
+> ⚠️ **注意:**  
+> `TrigFunc` では、インスタンスを生成してすぐにメソッドをチェーン呼び出しすることはできません  
+> （例: `F.Sample(10).method()`）。  
+>  
+> まず通常どおりインスタンスを生成して変数に代入し、  
+> その変数を通じて `TrigFunc` からメソッドを呼び出してください。  
+> （例: `smp = Sample(10)` → `F.smp.method()`）
 
 ### エラー
-- `InvalidArgumentError`  
-引数の数、型、または使い方に誤りがある場合に発生します。
 
-- `MissingLabelError`
+#### InvalidArgumentError
+引数の数、または使い方に誤りがある場合に発生します。
+
+#### MissingLabelError
 設定されたラベルが登録されていない場合に発生します。
+
+#### InvalidClassVarError
+`switch_var()`でクラス変数をグローバルスコープから登録した場合に発生します。
 
 ## ライセンス
 このプロジェクトは MIT ライセンスの下で公開されています。　
 詳細は LICENSE をご覧ください。
 
 ## 開発者
-Tsuruko　
-GitHub: @tsuruko12　
-X: @12tsuruko
+Tsuruko  
+GitHub: [@tsuruko12](https://github.com/tsuruko12)  
+X: [@12tsuruko](https://x.com/12tsuruko)
