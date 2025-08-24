@@ -6,14 +6,7 @@
 ![Package Size](https://img.shields.io/badge/size-25.1kB-lightgrey)
 
 ## Overview
-Dynamically switch multiple values at specific trigger points.
-
-> ⚠️ **This library is currently in beta. 
-> APIs may change in future releases, and some bugs may still be present.**
-
-> ⚠️ Function names like `alter_var()` and `alter_literal()` have been renamed 
-> to `switch_var()` and `switch_lit()` in the next update.  
-> The old names will remain available during the beta period for compatibility.
+Dynamically switch multiple values or functions at specific trigger points.
 
 ## Table of Contents
 - [Installation](#installation)
@@ -22,17 +15,11 @@ Dynamically switch multiple values at specific trigger points.
 - [Author](#author)
 
 ## Features
-- Switch multiple values at once with a single trigger point
+- Switch multiple values and functions at once with a single trigger point
 - No `if` or `match` statements needed
 - Switch both literal values and variables
 - Trigger early returns with optional return values
 - Automatically jump to other functions at a trigger point
-
-## Planned Feature
-- Support switching beyond values and function calls—toward broader code behavior control
-
-## Upcoming Feature
-- Support for delayed trigger execution (e.g., after N seconds)
 
 ## Installation
 ```bash
@@ -40,16 +27,34 @@ pip install triggon
 ```
 
 ## Usage
-This section explains how to use each function.
+This section explains how to use each part of the API.
 
-### Triggon 
-`Triggon(self, label: str | dict[str, Any], /, new: Any=None, *, debug: bool=False)`
+## API Reference
+- [Triggon](#triggon)
+  - [set_trigger](#set_trigger)
+  - [is_triggered](#is_triggered)
+  - [switch_lit](#switch_lit)
+  - [switch_var](#switch_var)
+  - [is_registered](#is_registered)
+  - [revert](#revert)
+  - [exit_point](#exit_point)
+  - [trigger_return](#trigger_return)
+  - [trigger_func](#trigger_func)
+- [TrigFunc](#trigfunc)
+- [Erorr](#error)
+  - [InvalidArgumentError](#invalidargumenterror)
+  - [MissingLabelError](#missinglabelerror)
+
+### Triggon
+`self, label: str | dict[str, Any], /, new: Any = None,`  
+`*, debug: bool | str | list[str] | tuple[str, ...] = False`  
+`-> None`
 
 `Triggon()` is initialized with label-value pairs.  
 You can pass a single label with its value, or multiple labels using a dictionary.
 
 If you pass multiple values to a label using a list,  
-each value will correspond to index 0, 1, 2, and so on, in the order you provide.
+each value is correspond to index 0, 1, 2, and so on, in the order you provide.
 
 ```python
 from triggon import Triggon
@@ -103,7 +108,7 @@ from dataclasses import dataclass
 
 from triggon import Triggon
 
-tg = Triggon("mode", new=True) # Set index 0 to True for label 'mode'
+tg = Triggon("mode", new=True) # Set index 0 to True for label "mode"
 
 @dataclass
 class ModeFlags:
@@ -137,62 +142,102 @@ s.set_mode(True)
 # mode_c is True
 ```
 
-If you want to trace label activity in real time, set the `debug` keyword to `True`.
-
-> ⚠️ **Note:** 
-Labels with the `*` prefix cannot be used during initialization 
-and will raise an `InvalidArgumentError`.
-
-### set_trigger
-`def set_trigger(self, label: str | list[str] | tuple[str, ...], /, *, cond: str=None) -> None`
-
-Marks the specified label(s) as triggered, 
-allowing their values to be updated on the next call.  
-All values associated with the specified label will be changed, regardless of their index.  
-The `label` parameter accepts a single string or a list/tuple of labels.
-
-You can set conditions using the `cond` keyword 
-but control structures such as `if` are not allowed.
-
-If any of the specified labels have been disabled using `revert()`, 
-this function has no effect on them.
+If you want to trace labels in real time, set the `debug` flag to `True`.  
+You can also control which labels are printed by passing either a single label as a string,  
+or multiple labels as a list/tuple.
 
 ```python
+Triggon({"A": 10, "B": 20}, debug=True)       # Prints both "A" and "B"
+
+Triggon({"A": 10, "B": 20}, debug="A")        # Prints only label "A"
+
+Triggon({"A": 10, "B": 20}, debug=("A", "B")) # Prints no labels
+```
+
+> ⚠️ **Note:** 
+> Labels with the `*` prefix cannot be used during initialization 
+> and will raise an `InvalidArgumentError`.
+
+### set_trigger
+`self, label: str | list[str] | tuple[str, ...], /,`  
+`*,`  
+`all: bool = False,`  
+`index: int = None,`  
+`cond: str = None,`  
+`after: int | float = None`  
+`-> None`
+
+Activates the given labels for switching values.  
+If the variables for the labels are already registered using `switch_var()`,  
+switches the values in this function.
+
+If `disable=True` was set in `revert()`, the labels are not activated.
+
+#### all
+If `True`, activates all labels.
+
+#### index
+Specifies the label index used to switch a variable’s value.  
+If not specified, the index given when calling `switch_var()` is used. 
+
+This applies only to `switch_var()`, not to `switch_lit()`.
+
+#### cond
+Sets a condition to activate the labels.
+
+> **⚠️ Note:**
+> This function uses `eval()` internally to process the given argument.  
+> **Only comparison expressions or single boolean values are allowed**  
+> (e.g., `x > 0 > y`, `value == 10`).  
+> If the argument is a single literal or variable,  
+> its value must be a bool; Otherwise, `InvalidArgumentError` is raised.  
+> Function calls also raise this error.
+
+#### after
+Sets the delay in seconds before labels become active.  
+If specified again while a delay is active, the initial duration is kept.
+
+> **⚠️ Note:**
+> Execution actually occurs **about 0.011 seconds later** than the specified time.
+
+```python
+import random
+
 from triggon import Triggon
 
 tg = Triggon({
-    "milk": 3,
-    "banana": 0.4,
-    "msg": "We're having a sale for milk today!",
+    "timeout": None, 
+    "mark": ("〇", "✖"), 
+    "add": (1, 0),
 })
 
-def example():
-    msg = tg.switch_lit("msg", org="We're open as usual today.")
-    print(msg)
+mark = None
+point = None
+correct = 0
+tg.switch_var({"mark": mark, "add": point}) # Register the variables
 
-    milk = tg.switch_lit('milk', 4)
-    banana = tg.switch_lit('banana', 0.6)
+print("How many can you get right in 10 seconds?")
+tg.set_trigger("timeout", after=10) # Activate the label "time" after 10s
 
-    print(f"Milk: ${milk}")
-    print(f"Banana: ${banana}")
+for _ in range(15):
+    x = random.randint(1, 10)
+    y = random.randint(1, 10)
 
-example()
-# == Output ==
-# We're open as usual today.
-# Milk: $4
-# Banana: $0.6
+    answer = int(input(f"{x} × {y} = ") or 0)
+    tg.set_trigger(("mark", "add"), cond="answer == x*y")          # "mark" -> "〇", "add" -> 1
+    tg.set_trigger(("mark", "add"), index=1, cond="answer != x*y") # "mark" -> "✖", "add" -> 0
+    print(mark)
 
-tg.set_trigger(["milk", "msg"]) # Triggers for 'milk' and 'msg' are activated here.
+    correct += point
 
-example()
-# == Output ==
-# We're having a sale for milk today!
-# Milk: $3
-# Banana: $0.6
+    if tg.is_triggered("timeout"): # Check if the label "timeout" is active
+        print("Time's up!")
+        print(f"You got {correct} correct!")
+        break
 ```
 
 ```python
-tg = Triggon("msg", "Call me?")
+tg = Triggon("msg", new="Call me?")
 
 def sample(print_msg: bool):
     # Activate "msg" if print_msg is True
@@ -201,53 +246,73 @@ def sample(print_msg: bool):
     # Print the message if triggered
     print(tg.switch_lit("msg", ""))
 
-sample(False) # Output:
+sample(False) # Output: ""
 sample(True)  # Output: Call me? 
 ```
 
-> **Note:**
-This function uses `eval()` internally to evaluate the `cond` argument.
-However, **only comparison expressions (e.g., `x > 0 > y`, `value == 10`) are allowed**.
-Non-comparison expressions will raise an `InvalidArgumentError`.
+### is_triggered
+`self, label: str | list[str] | tuple[str, ...]`  
+`-> bool | list[bool] | tuple[bool, ...]`
 
-### switch_lit (alter_literal)
-`def switch_lit(self, label: str | list[str] | tuple[str, ...], /, org: Any, *, index: int=None) -> Any`
-
-Changes a literal value when the flag is active.  
-You can also use this function directly inside a print().  
-When using a dictionary for `label`, the `index` keyword cannot be used.
+Returns `True` or `False` for each label, depending on whether it is active.  
+The return type depends on the given arguments.
 
 ```python
 from triggon import Triggon
 
-tg = Triggon("text", new="After") 
+tg = Triggon({"A": None, "B": None, "C": None, "D": None})
+
+tg.set_trigger(("A", "D"))
+
+print(tg.is_triggered("A"))                # Output: True
+print(tg.is_triggered(["C", "D"]))         # Output: [False, True]
+print(tg.is_triggered("A", "B", "C", "D")) # Output: (True, False, False, True)
+```
+
+### switch_lit
+`self, label: str | list[str] | tuple[str, ...], /,`  
+`org: Any,`  
+`*, index: int = None`  
+`-> Any`
+
+Switches the value for the given label when it is active.  
+If multiple labels are passed and more than one of them are active,  
+the one with the lower index in the sequence takes priority.
+
+**Direct variable references are not allowed.**
+
+If the return value is a function delayed by the `TrigFunc` class,  
+it is automatically executed and its result is returned.
+
+When the `index` keyword argument is specified for multiple labels,  
+it is applied to all labels.
+
+```python
+from triggon import Triggon, TrigFunc
+
+F = TrigFunc() # Wrapper for delayed function execution
+tg = Triggon("text", new=F.print("After")) 
 
 def example():
-    text = tg.switch_lit("text", org="Before", index=0)
-    print(text)  
-
-    # You can also write: 
-    # print(tg.alter_literal('text', 'Before'))
-
-    tg.set_trigger("text")
+    tg.switch_lit("text", org=F.print("Before"))
 
 example() # Output: Before
+
+tg.set_trigger("text")
 example() # Output: After
 ```
 
-Alternatively, you can use the `*` character as a prefix to specify the index.  
+You can also use the `*` character as a prefix to specify the index.  
 For example, `"label"` refers to index 0, and `"*label"` refers to index 1.
-
-You can use the `index` keyword or the `*` prefix.  
-When both are provided, the keyword takes precedence.  
 `*` used elsewhere (not as a prefix) is ignored and has no special meaning.
+If both the keyword and `*` are used, **the keyword takes priority.**  
 
 > **Note:**   
-For better readability when working with multiple indices, 
-it's recommended to use the `index` keyword.
+> For better readability when working with multiple indices, 
+> it's recommended to use the `index` keyword argument.
 
 ```python
-# Set the value to 'A' for index 0 and to 'B' for index 1
+# Set the value to "A" for index 0 and to "B" for index 1
 tg = Triggon("char", new=("A", "B"))
 
 def example():
@@ -255,7 +320,7 @@ def example():
 
     print(tg.switch_lit("char", 0))           # index 0 (no '*' — defaults to index 0)
     print(tg.switch_lit("*char", 1))          # index 1 (using '*')
-    print(tg.switch_lit("*char", 0, index=0)) # index 0 ('index' keyword takes precedence over '*')
+    print(tg.switch_lit("*char", 0, index=0)) # index 0 ('index' keyword takes priority over '*')
     print(tg.switch_lit("char", 1, index=1))  # index 1 (using 'index' keyword)
 
 example()
@@ -270,7 +335,7 @@ example()
 tg = Triggon({"A": True, "B": False})
 
 def sample():
-    # Applies the new value if any label is active.
+    # Switch the new value if any label is active.
     # If both are active, the earlier one takes priority.
     x = tg.switch_lit(["A", "B"], None)
 
@@ -285,30 +350,33 @@ tg.set_trigger("B") # Output: True
 sample()
 ```
 
-> **Note:**   
-When multiple labels are passed and multiple flags are active,  
-the earliest label in the sequence takes precedence.
-In that case, if the `index` keyword is passed,  
-it will be applied to all labels.
+### switch_var
+`self, label: str | dict[str, Any], var: Any = None, /,`  
+`*, index: int = None`  
+`-> Any`
 
-### switch_var (alter_var)
-`def switch_var(self, label: str | dict[str, Any], var: Any=None, /, *, index: int=None) -> None | Any`
+Registers the given variables with the specified labels and indices.  
+When the labels are active, their values are switched.  
+If the variables are already registered, switching is handled by `set_trigger()`.
 
-Changes variable value(s) directly when the flag is active.  
-**It supports global variables and class attributes, but not local variables.**
+**Global variables and class attributes are supported, but local variables are not.**  
+When class attributes are registered from the global scope,  
+`InvalidClassVarError` is raised.
 
-You can pass multiple labels and variables using a dictionary.    
-The `index` keyword cannot be used in that case.  
-If the target index is 1 or greater, 
-add a `*` prefix to the label corresponding to the index  
-(e.g., `*label` for index 1, `**label` for index 2).
+This function returns the value of the variable when a single label is passed.  
+Otherwise, it returns `None`.  
+If the return value is a function delayed by the `TrigFunc` class,  
+it is automatically executed and its result is returned.
 
-This function returns the updated value **only when a single label is passed**.  
-If a dictionary is passed, the function returns `None`.
+When the `index` keyword argument is specified with multiple labels,  
+the same index is applied to all of them.  
 
-> **Note:**  
-In such cases, it is recommended to use individual calls to this function  
-with the `index` keyword instead, for better readability.
+You can also use the `*` character as a prefix to specify the index.  
+For example, `"label"` refers to index 0, and `"*label"` refers to index 1.  
+`*` used elsewhere (not as a prefix) is ignored and has no special meaning.  
+If both the keyword and `*` are used, **the keyword takes priority.**  
+
+When specifying different indices for multiple labels, use `*` instead.
 
 ```python
 import random
@@ -341,63 +409,38 @@ def spin_gacha():
 spin_gacha()
 ```
 
-```python
-from dataclasses import dataclass
-
-from triggon import Triggon
-
-tg = Triggon("even", [0, 2, 4])
-
-@dataclass
-class Example:
-    a: int = 1
-    b: int = 3
-    c: int = 5
-
-    def change_field_values(self, change: bool):
-        if change:
-            tg.set_trigger("even")
-
-        tg.alter_var({
-            "even": self.a,    # index 0
-            "*even": self.b,   # index 1
-            "**even": self.c,  # index 2
-        })
-
-exm = Example()
-
-exm.change_field_values(False)
-print(f"a: {exm.a}, b: {exm.b}, c: {exm.c}")
-# Output: a: 1, b: 3, c: 5
-
-exm.change_field_values(True)
-print(f"a: {exm.a}, b: {exm.b}, c: {exm.c}")
-# Output: a: 0, b: 2, c: 4
-```
-
 Also, you can assign multiple values to a single variable.
 
 ```python
-tg = Triggon({
-    "flag": [True, False],
-    "num": [0, 100],
-})
+import math
 
-@dataclass
-class Sample:
-    flag: bool = None
-    num: int = None
+from triggon import Triggon, TrigFunc
 
-    def sample(self, label: str, label_2: str):
-        tg.switch_var({label: self.flag, label_2: self.num})
+F = TrigFunc()
+tg = Triggon("var", new=["ABC", True, F.math.sqrt(100)])
 
-        print(f"flag is {self.flag} and num is {self.num}")
+x = None
 
-s = Sample()
-tg.set_trigger(["flag", "num"])
+tg.set_trigger("var")
 
-s.sample("flag", "num")   # Output: flag is True and num is 0
-s.sample("*flag", "*num") # Output: flag is False and num is 100
+value = tg.switch_var("var", x)
+print(value) # Output: "ABC"
+
+tg.set_trigger("var", index=1)
+print(x)     # Output: True
+
+# If the return value is a function delayed by `TrigFunc`,
+# set_trigger() does not call it.
+tg.set_trigger("var", index=2)
+print(x) # Output: <function TrigFunc...>
+
+# In that case, you need to call it manually
+if tg.is_triggered("var"):
+    print(x()) # Output: 10.0
+
+# switch_var() calls it and returns the result
+value = tg.switch_var("var", x, index=2)
+print(value) # Output: 10.0
 ```
 
 > **Notes:** 
@@ -408,24 +451,100 @@ s.sample("*flag", "*num") # Output: flag is False and num is 100
 > Once registration is complete, each call to `set_trigger()` immediately updates the value.  
 >
 > In some environments (e.g., Jupyter or REPL),  
-> calls to alter_var or switch_var may not be detected due to source code unavailability.
+> calls to `switch_var()` may not be detected due to source code unavailability.
 >
 > This function only supports  
 > literal values, variables, or simple attribute chains for labels and the `index` keyword.  
-> Other types will raise an `InvalidArgumentError`.
+> Other types will raise `InvalidArgumentError`.
+
+### is_registered
+`self, *variable: str`  
+`-> bool | list[bool] | tuple[bool, ...]`
+
+Returns `True` or `False` for each variable, depending on whether it has been registered.  
+The return type depends on the given arguments.
+
+Raises `InvalidArgumentError` if the arguments are not variables.
+
+```python
+tg = Triggon("var", None)
+
+@dataclass
+class Sample:
+    x: int = 0
+    y: int = 0
+    z: int = 0
+
+    def func(self):
+        tg.switch_var("var", [smp.x, smp.z])
+        print(tg.is_registered(["self.y", "self.z"]))
+
+smp = Sample()
+smp.func() # Output: [False, True]
+
+print(tg.is_registered("smp.x"))                # Output: True
+print(tg.is_registered("Sample.x", "Sample.y")) # Output: [True, False]
+```
 
 ### revert
-`def revert(self, label: str | list[str] | tuple[str, ...]=None, /, *, all: bool=False, disable: bool=False) -> None`
+`self, label: str | list[str] | tuple[str, ...] = None, /,`  
+`*,`  
+`all: bool = False,`  
+`disable: bool = False,`  
+`cond: str = None,`  
+`after: int | float = None`  
+`-> None`
 
-Reverts all values previously changed by `switch_lit()` or `switch_var()`  
-to their original state.  
-To revert all labels, set the `all` keyword to `True`.
+Deactivates the given labels and restores their original values.
 
-The reversion remains effective until the next call to `set_trigger()`.  
-All values associated with the specified label will be reverted, 
-regardless of their index.
+The state remains effective until the next call to `set_trigger()`.  
+All values associated with the specified labels are reverted.
 
-If the `disable` keyword is set to `True`, the reversion becomes permanent.
+#### all
+If `True`, Deactivates all labels.
+
+#### disable
+If `True`, permanently disables the labels.  
+
+In this state, `set_trigger()` does not activate them.
+
+```python
+tg = Triggon("flag", new="Active")
+
+def sample():
+    tg.set_trigger("flag") # Activate "flag" on each call
+
+    x = tg.switch_lit("flag", org="Inactive")
+    print(x)
+
+sample() # Output: Active
+
+# The effect persists until the next call to set_trigger()
+tg.revert("flag")
+sample() # Output: Active
+
+# Permanently disable "flag"
+tg.revert("flag", disable=True)
+sample() # Output: Inactive
+```
+
+#### cond
+Sets a condition to dactivate the labels.
+
+> **⚠️ Note:**
+> This function uses `eval()` internally to process the given argument.  
+> **Only comparison expressions or single boolean values are allowed**  
+> (e.g., `x > 0 > y`, `value == 10`).  
+> If the argument is a single literal or variable,  
+> its value must be a bool; Otherwise, `InvalidArgumentError` is raised.  
+> Function calls also raise this error.
+
+#### after
+Sets the delay in seconds before labels become inactive.  
+If specified again while a delay is active, the initial duration is kept.
+
+> **⚠️ Note:**
+> Execution actually occurs **about 0.011 seconds later** than the specified time.
 
 ```python
 from dataclasses import dataclass
@@ -458,9 +577,7 @@ class User:
             tg.revert("hi") # Revert to the original value
 
 user = User()
-
 user.entry() # Output: Hello, Guest!
-
 user.entry() # Output: Welcome back, Guest!
 ```
 
@@ -491,99 +608,96 @@ print(f"User name: {user.name}\nOnline: {user.online}")
 ```
 
 ### exit_point
-`def exit_point(self, label: str, func: TrigFunc, /) -> None | Any`
+`self, func: TrigFunc`  
+`-> Any`
 
 Defines the exit point where an early return is triggered by `trigger_return()`.  
 The `func` argument must be a `TrigFunc` instance that wraps the target function.  
 
-An index with the `*` prefix can be used, but it is ignored.
-
 > **Note:** `exit_point()` is not required if `trigger_return()` is not triggered.
 
 ### trigger_return
-`trigger_return(self, label: str, /, ret: Any=None, *, index: int=None, do_print: bool=False) -> None | Any`
+`self, label: str | list[str] | tuple[str, ...], /,`  
+`ret: Any = ...,`  
+`*, index: int = None`  
+`-> Any`
 
-Triggers an early return with any value when the flag is active.  
-The return value must be set during initialization.  
-If nothing needs to be returned, set it to `None` or simply omit the value..
+Triggers an early return with a value when any given label is active.  
+The return value should be set at initialization.  
+If no value is needed, you can set it to `None`,  
+or just omit it (unless you’re using a dictionary).
 
-You can also set the return value with the `ret` keyword,  
-which takes precedence over the one set during initialization.
-In that case, you don't need to provide any value if you're not using a dictionary.
+You can also set the return value with the `ret` keyword argument.  
+**This takes priority over the value from initialization**.  
+This is useful when you need to set a return value dynamically.
 
-If the `do_print` keyword is set to `True`, the return value will be printed.  
-If the value is not a string, an `InvalidArgumentError` is raised.
+If the return value is a function delayed by the `TrigFunc` class,  
+it is automatically executed and its result is returned.
 
 ```python
 from triggon import Triggon, TrigFunc
 
-# Define label and early-return value
-tg = Triggon("skip", new="(You don't have enough money...)")
-F = TrigFunc() # Wraps the target function for early return
+tg = Triggon("ret", None)
 
-def check_funds(money: int):
-    if money < 300:
-        tg.set_trigger("skip")
+def sample(num):
+    added = num + 5
+    tg.set_trigger("ret", cond="added < 10")
 
-    print(f"You now have {money}G.")
-    board_ship()
+    # Triggers an early return if 'added' is less than 10
+    tg.trigger_return("ret")
 
-def board_ship():
-    print("It'll cost you 300G to board the ship.")
+    result = added / 10
+    return result
 
-    # Triggers early return and prints the value if the flag is set
-    tg.trigger_return("skip", do_print=True) 
+F = TrigFunc() # Variable for delay
 
-    print("Enjoy the ride!")  
+result = tg.exit_point(F.sample(10))
+print(result) # Output: 1.5
 
-tg.exit_point("skip", F.check_funds(500))
-# == Output ==
-# You now have 500G.
-# It'll cost you 300G to board the ship.
-# Enjoy the ride!
-
-tg.exit_point("skip", F.check_funds(200))
-# == Output ==
-# You now have 200G.
-# It'll cost you 300G to board the ship.
-# (You don't have enough money...)
+result = tg.exit_point(F.sample(3))
+print(result) # Output: None
 ```
 
 ```python
-tg = Triggon("zero")
+tg = Triggon("skip") # If no return value is needed, just pass the label
 F = TrigFunc()
 
-def sample():
-    num = get_number()
+def sample():    
+    # If "skip" is active, call the function 
+    # and return early with its result
+    ret_value = tg.trigger_func("skip", F.func())
+    tg.trigger_return("skip", ret=ret_value)
 
-    # The "zero" label will be activated if `num` is 0
-    tg.set_trigger("zero", cond="num == 0")
+    print("No return value")
 
-    # Return early with the message if triggered
-    tg.trigger_return("zero", ret=f"{num} ...", do_print=True) 
+def func():
+    return "return value"
 
-    num_2 = get_number()
+value = sample()
+print(value)
+# == Output ==
+# No return value
+# None
 
-    print(f"The total number is {num + num_2}!")
-
-def get_number():
-    return random.randint(0, 10) 
-
-tg.exit_point("zero", F.sample()) # The output is random!
+tg.set_trigger("skip") # Activate "skip"
+value = tg.exit_point(F.sample())
+print(value)
+# == Output ==
+# return value
 ```
 
 ### trigger_func
-`def trigger_func(self, label: str, func: TrigFunc, /) -> None | Any`
+`self, label: str | list[str] | tuple[str, ...], /,`  
+`func: TrigFunc`  
+`-> Any`
 
-Triggers a function when the flag is active.  
+Triggers a function when any given label is active.  
 The `func` argument must be a `TrigFunc` instance that wraps the target function.
 
-A label must be initialized with any value in order to register it when creating a `Triggon` instance.  
-The value won't be returned, so you can use any placeholder.  
-If you're not using a dictionary, there's no need to provide a value at all.  
-**If the function returns a value, that value will also be returned.**.
-
-An index with the `*` prefix can be used, but it is ignored.
+The return value should be set at initialization,  
+but since the set value is never returned, any value can be used safely.
+You can also omit it (unless you’re using a dictionary).  
+**If the function returns a value, that value will also be returned**.
 
 ```python
 from triggon import Triggon, TrigFunc
@@ -592,42 +706,54 @@ tg = Triggon({
     "skip": None,
     "call": None,
 })
-F = TrigFunc()
 
-def example():
-    tg.set_trigger(["skip", "call"]) # Set triggers for early return and function call
+def func_a():
+    tg.set_trigger(all=True) # Activate all labels
 
-    print("If the 'call' flag is active, jump to example_2().")
+    print("If the 'call' is active, go to func_b().")
 
-    tg.trigger_func("call", F.example_2()) # Use the TrigFunc instance F for example_2()
+    tg.trigger_func("call", F.func_b())
 
     print("This message may be skipped depending on the trigger.")
 
 
-def example_2():
-    print("You’ve reached the example_2() function!")
+def func_b():
+    print("You’ve entered func_b()!")
     tg.trigger_return("skip")
 
-tg.exit_point("skip", F.example())
+F = TrigFunc()
+tg.exit_point(F.func_a())
 # == Output ==
-# If the 'call' flag is active, jump to example_2().
-# You’ve reached the example_2() function!
+# If the 'call' is active, go to func_b().
+# You’ve entered func_b()!
 ```
 
 ### TrigFunc
-This class wraps a function to delay its execution.   
-You can create an instance without any arguments and use it to wrap the target function.
+This class wraps a function to delay its execution.  
+Create an instance without any arguments and then, use the variable  
+to wrap the target function.
+
+It can delay most functions from existing libraries as well as your own,  
+but not instance methods.
 
 > ⚠️ **Note:**  
-When using this class,  
-you must create an instance first (e.g., F = TrigFunc()) before using it.
+> `TrigFunc` does not support creating an instance and immediately chaining its methods  
+> (e.g., `F.Sample(10).method()`).  
+>  
+> You must first create the instance normally, assign it to a variable,  
+> and then call its methods through `TrigFunc`  
+> (e.g., `smp = Sample(10)` → `F.smp.method()`).
 
 ### Error
-- `InvalidArgumentError`  
-Raised when the number of arguments, their types, or usage is incorrect.
 
-- `MissingLabelError`
-Raised when a specific label has not been registered.
+#### InvalidArgumentError
+Raised when the number of arguments or their usage is incorrect.
+
+#### MissingLabelError
+Raised when the specific label has not been registered.
+
+#### InvalidClassVarError
+Raised when class attributes are registered from the global scope in `switch_var()`.
 
 ## License
 This project is licensed under the MIT License.  
