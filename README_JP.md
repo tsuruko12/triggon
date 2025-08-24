@@ -3,7 +3,7 @@
 [![PyPI](https://img.shields.io/pypi/v/triggon)](https://pypi.org/project/triggon/)
 ![Python](https://img.shields.io/pypi/pyversions/triggon)
 ![Python](https://img.shields.io/pypi/l/triggon)
-![Package Size](https://img.shields.io/badge/size-25.1kB-lightgrey)
+![Package Size](https://img.shields.io/badge/size-31kB-lightgrey)
 
 # 概要
 特定のトリガーポイントで単体または複数の値や関数を動的に切り替えるライブラリです。
