@@ -43,6 +43,7 @@ pip install triggon
 - [TrigFunc](#trigfunc)
 - [Erorr](#error)
   - [InvalidArgumentError](#invalidargumenterror)
+  - [InvalidClassVarError](#invalidclassvarerror)
   - [MissingLabelError](#missinglabelerror)
 
 ### Triggon
@@ -732,11 +733,11 @@ tg.exit_point("skip", F.func_a())
 #### InvalidArgumentError
 引数の数、または使い方に誤りがある場合に発生します。
 
-#### MissingLabelError
-設定されたラベルが登録されていない場合に発生します。
-
 #### InvalidClassVarError
 `switch_var()`でクラス変数をグローバルスコープから登録した場合に発生します。
+
+#### MissingLabelError
+設定されたラベルが登録されていない場合に発生します。
 
 ## ライセンス
 このプロジェクトは MIT ライセンスの下で公開されています。　
