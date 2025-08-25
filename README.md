@@ -43,6 +43,7 @@ This section explains how to use each part of the API.
 - [TrigFunc](#trigfunc)
 - [Erorr](#error)
   - [InvalidArgumentError](#invalidargumenterror)
+  - [InvalidClassVarError](#invalidclassvarerror)
   - [MissingLabelError](#missinglabelerror)
 
 ### Triggon
@@ -749,11 +750,11 @@ but not instance methods.
 #### InvalidArgumentError
 Raised when the number of arguments or their usage is incorrect.
 
-#### MissingLabelError
-Raised when the specific label has not been registered.
-
 #### InvalidClassVarError
 Raised when class attributes are registered from the global scope in `switch_var()`.
+
+#### MissingLabelError
+Raised when the specific label has not been registered.
 
 ## License
 This project is licensed under the MIT License.  
