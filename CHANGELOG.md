@@ -49,10 +49,6 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Various bug fixes
 
-### Known Issues
-- `switch_var()` may not work correctly when used multiple times in a single comparison expression  
-  (since the value is updated in real time)
-
 ## [0.1.0b4] - 2025-07-22
 ### Changed
 - Supported empty sequences or dictionaries as new values
