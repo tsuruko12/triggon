@@ -12,7 +12,6 @@ from ._internal._err_handler import (
 )
 from ._internal._exceptions import (
   InvalidArgumentError, 
-  InvalidClassVarError,
   SYMBOL,
   _ExitEarly,
 )
@@ -351,11 +350,11 @@ class Triggon:
               if isinstance(var_ref, list):
                   for v in var_ref:
                       self._update_var_value(
-                          v, label, i[0], self._new_values[name][i[0]],
+                          v, name, i[0], self._new_values[name][i[0]],
                       )
               else:
                   self._update_var_value(
-                      var_ref, label, i[0], self._new_values[name][i[0]],
+                      var_ref, name, i[0], self._new_values[name][i[0]],
                   )
               ret_value = self._new_values[name][i[0]]
             else:
