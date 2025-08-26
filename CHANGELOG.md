@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ---
 ### [1.0.1] - 2025-08-26
 ### Fixed
-- Raise error when passing a `dict` to the `label` argument in `switch_var()`
+- Raise error when switching values in `switch_var()`.
 
 ## [1.0.0] - 2025-08-23
 ### Added
