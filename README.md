@@ -4,9 +4,10 @@
 ![Python](https://img.shields.io/pypi/pyversions/triggon)
 ![Python](https://img.shields.io/pypi/l/triggon)
 ![Package Size](https://img.shields.io/badge/size-31kB-lightgrey)
+[![Downloads](https://pepy.tech/badge/triggon)](https://pepy.tech/project/triggon)
 
 ## Overview
-Dynamically switch multiple values or functions at specific trigger points.
+This library dynamically switches values and functions at labeled trigger points.
 
 ## Table of Contents
 - [Installation](#installation)
@@ -16,10 +17,11 @@ Dynamically switch multiple values or functions at specific trigger points.
 
 ## Features
 - Switch multiple values and functions at once with a single trigger point
-- No `if` or `match` statements needed
+- Eliminates the need for `if` or `match` statements
 - Switch both literal values and variables
 - Trigger early returns with optional return values
-- Automatically jump to other functions at a trigger point
+- Call functions at any time
+- Delay execution of almost any library and custom function
 
 ## Installation
 ```bash
@@ -46,8 +48,11 @@ This section explains how to use each part of the API.
   - [InvalidClassVarError](#invalidclassvarerror)
   - [MissingLabelError](#missinglabelerror)
 
+---
+
 ### Triggon
-`self, label: str | dict[str, Any], /, new: Any = None,`  
+`self, label: str | dict[str, Any], /,`  
+`new: Any = None,`  
 `*, debug: bool | str | list[str] | tuple[str, ...] = False`  
 `-> None`
 
@@ -159,6 +164,8 @@ Triggon({"A": 10, "B": 20}, debug=("A", "B")) # Prints no labels
 > Labels with the `*` prefix cannot be used during initialization 
 > and will raise an `InvalidArgumentError`.
 
+---
+
 ### set_trigger
 `self, label: str | list[str] | tuple[str, ...], /,`  
 `*,`  
@@ -174,16 +181,16 @@ switches the values in this function.
 
 If `disable=True` was set in `revert()`, the labels are not activated.
 
-#### all
+#### ***all***
 If `True`, activates all labels.
 
-#### index
-Specifies the label index used to switch a variable’s value.  
+#### ***index***
+Specifies the label index used to switch a variable's value.  
 If not specified, the index given when calling `switch_var()` is used. 
 
 This applies only to `switch_var()`, not to `switch_lit()`.
 
-#### cond
+#### ***cond***
 Sets a condition to activate the labels.
 
 > **⚠️ Note:**
@@ -194,7 +201,7 @@ Sets a condition to activate the labels.
 > its value must be a bool; Otherwise, `InvalidArgumentError` is raised.  
 > Function calls also raise this error.
 
-#### after
+#### ***after***
 Sets the delay in seconds before labels become active.  
 If specified again while a delay is active, the initial duration is kept.
 
@@ -251,6 +258,8 @@ sample(False) # Output: ""
 sample(True)  # Output: Call me? 
 ```
 
+---
+
 ### is_triggered
 `self, label: str | list[str] | tuple[str, ...]`  
 `-> bool | list[bool] | tuple[bool, ...]`
@@ -269,6 +278,8 @@ print(tg.is_triggered("A"))                # Output: True
 print(tg.is_triggered(["C", "D"]))         # Output: [False, True]
 print(tg.is_triggered("A", "B", "C", "D")) # Output: (True, False, False, True)
 ```
+
+---
 
 ### switch_lit
 `self, label: str | list[str] | tuple[str, ...], /,`  
@@ -350,6 +361,8 @@ sample()
 tg.set_trigger("B") # Output: True
 sample()
 ```
+
+---
 
 ### switch_var
 `self, label: str | dict[str, Any], var: Any = None, /,`  
@@ -458,6 +471,8 @@ print(value) # Output: 10.0
 > literal values, variables, or simple attribute chains for labels and the `index` keyword.  
 > Other types will raise `InvalidArgumentError`.
 
+---
+
 ### is_registered
 `self, *variable: str`  
 `-> bool | list[bool] | tuple[bool, ...]`
@@ -487,6 +502,8 @@ print(tg.is_registered("smp.x"))                # Output: True
 print(tg.is_registered("Sample.x", "Sample.y")) # Output: [True, False]
 ```
 
+---
+
 ### revert
 `self, label: str | list[str] | tuple[str, ...] = None, /,`  
 `*,`  
@@ -501,10 +518,10 @@ Deactivates the given labels and restores their original values.
 The state remains effective until the next call to `set_trigger()`.  
 All values associated with the specified labels are reverted.
 
-#### all
+#### ***all***
 If `True`, Deactivates all labels.
 
-#### disable
+#### ***disable***
 If `True`, permanently disables the labels.  
 
 In this state, `set_trigger()` does not activate them.
@@ -529,7 +546,7 @@ tg.revert("flag", disable=True)
 sample() # Output: Inactive
 ```
 
-#### cond
+#### ***cond***
 Sets a condition to dactivate the labels.
 
 > **⚠️ Note:**
@@ -540,7 +557,7 @@ Sets a condition to dactivate the labels.
 > its value must be a bool; Otherwise, `InvalidArgumentError` is raised.  
 > Function calls also raise this error.
 
-#### after
+#### ***after***
 Sets the delay in seconds before labels become inactive.  
 If specified again while a delay is active, the initial duration is kept.
 
@@ -608,6 +625,8 @@ print(f"User name: {user.name}\nOnline: {user.online}")
 # Online: True
 ```
 
+---
+
 ### exit_point
 `self, func: TrigFunc`  
 `-> Any`
@@ -616,6 +635,8 @@ Defines the exit point where an early return is triggered by `trigger_return()`.
 The `func` argument must be a `TrigFunc` instance that wraps the target function.  
 
 > **Note:** `exit_point()` is not required if `trigger_return()` is not triggered.
+
+---
 
 ### trigger_return
 `self, label: str | list[str] | tuple[str, ...], /,`  
@@ -687,6 +708,8 @@ print(value)
 # return value
 ```
 
+---
+
 ### trigger_func
 `self, label: str | list[str] | tuple[str, ...], /,`  
 `func: TrigFunc`  
@@ -719,15 +742,17 @@ def func_a():
 
 
 def func_b():
-    print("You’ve entered func_b()!")
+    print("You've entered func_b()!")
     tg.trigger_return("skip")
 
 F = TrigFunc()
 tg.exit_point(F.func_a())
 # == Output ==
 # If the 'call' is active, go to func_b().
-# You’ve entered func_b()!
+# You've entered func_b()!
 ```
+
+---
 
 ### TrigFunc
 This class wraps a function to delay its execution.  
@@ -745,15 +770,17 @@ but not instance methods.
 > and then call its methods through `TrigFunc`  
 > (e.g., `smp = Sample(10)` → `F.smp.method()`).
 
+---
+
 ### Error
 
-#### InvalidArgumentError
+#### ***InvalidArgumentError***
 Raised when the number of arguments or their usage is incorrect.
 
-#### InvalidClassVarError
+#### ***InvalidClassVarError***
 Raised when class attributes are registered from the global scope in `switch_var()`.
 
-#### MissingLabelError
+#### ***MissingLabelError***
 Raised when the specific label has not been registered.
 
 ## License
