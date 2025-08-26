@@ -12,12 +12,12 @@ license = {file = "LICENSE"}
 keywords = [
   "python", 
   "python-Libraries", 
-  "triggon"
+  "triggon",
   "automation", 
   "dynamic-switching", 
   "delayed-execution",
   "early-return", 
-  "lightweight"
+  "lightweight",
 ]
 classifiers = [
     "Programming Language :: Python :: 3.12",
