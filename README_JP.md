@@ -4,9 +4,10 @@
 ![Python](https://img.shields.io/pypi/pyversions/triggon)
 ![Python](https://img.shields.io/pypi/l/triggon)
 ![Package Size](https://img.shields.io/badge/size-31kB-lightgrey)
+[![Downloads](https://pepy.tech/badge/triggon)](https://pepy.tech/project/triggon)
 
 # 概要
-特定のトリガーポイントで単体または複数の値や関数を動的に切り替えるライブラリです。
+このライブラリはラベル付きトリガーポイントで値や関数を動的に切り替えることができます。 
 
 ## 目次
 - [インストール方法](#インストール方法)
@@ -15,11 +16,12 @@
 - [開発者](#開発者)
 
 ## 特徴
-- 単一のトリガーポイントで複数の値や関数をまとめて切り替え可能
-- if や match 文は不要
-- リテラル値・変数の両方を切り替え可能
-- 任意の戻り値付きで早期リターンが可能
-- トリガー時に他の関数へ自動ジャンプ可能
+- １つのトリガーポイントで複数の値や関数を一度に切り替え
+- `if` や `match` 文を書く必要なし 
+- リテラル値・変数の両方の切り替え可能
+- 任意の戻り値で早期リターンが可能
+- 関数を好きなタイミングで呼び出し可能  
+- ほとんどのライブラリ関数やカスタム関数を遅延実行できる  
 
 ## インストール方法
 ```bash
@@ -157,6 +159,8 @@ Triggon({"A": 10, "B": 20}, debug=("A", "B")) # 出力なし
 > ⚠️ **Note:** 
 > `*` プレフィックス付きのラベルは初期化時には使用できず、`InvalidArgumentError` が発生します。　
 
+---
+
 ### set_trigger
 `self, label: str | list[str] | tuple[str, ...], /,`  
 `*,`  
@@ -171,16 +175,16 @@ Triggon({"A": 10, "B": 20}, debug=("A", "B")) # 出力なし
 
 `revert()` で `disable=True` に設定されてる場合、そのラベルは有効化されません。
 
-#### all
+#### ***all***
 `True` に設定すると、すべてのラベルを有効にします。
 
-#### index
+#### ***index***
 値を切り替える際のラベルのインデックス値を指定します。  
 指定されてない場合は、`switch_var()` で指定されたインデックスが使用されます。  
 
 これは `switch_var()` にのみ適用され、`switch_lit()` には適用されません。
 
-#### cond
+#### ***cond***
 ラベルを有効にする条件を設定します。
 
 > **⚠️ Note:**  
@@ -190,7 +194,7 @@ Triggon({"A": 10, "B": 20}, debug=("A", "B")) # 出力なし
 > 値が `ブール値` 以外の時 `InvalidArgumentError` が発生します。  
 > 関数呼び出しの場合も同様です。
 
-#### after
+#### ***after***
 ラベルを有効化するまでの遅延時間を秒数で指定します。  
 遅延中に再度指定された場合は上書きされずに、最初の秒数が維持されます。
 
@@ -247,6 +251,8 @@ sample(False) # Output: ""
 sample(True)  # Output: 呼びましたか？ 
 ```
 
+---
+
 ### is_triggered
 `self, label: str | list[str] | tuple[str, ...]`  
 `-> bool | list[bool] | tuple[bool, ...]`
@@ -265,6 +271,8 @@ print(tg.is_triggered("A"))                # 出力: True
 print(tg.is_triggered(["C", "D"]))         # 出力: [False, True]
 print(tg.is_triggered("A", "B", "C", "D")) # 出力: (True, False, False, True)
 ```
+
+---
 
 ### switch_lit
 `self, label: str | list[str] | tuple[str, ...], /,`  
@@ -344,6 +352,8 @@ sample()
 tg.set_trigger("B") # Output: True
 sample()
 ```
+
+---
 
 ### switch_var
 `self, label: str | dict[str, Any], var: Any = None, /,`  
@@ -445,6 +455,8 @@ print(value) # 出力: 10.0
 > この関数では、ラベルおよび `index` 引数にリテラル値・変数・属性チェーン以外を指定すると、
 > `InvalidArgumentError` が発生します。
 
+---
+
 ### is_registered
 `self, *variable: str`  
 `-> bool | list[bool] | tuple[bool, ...]`
@@ -474,6 +486,8 @@ print(tg.is_registered("smp.x"))                # 出力: True
 print(tg.is_registered("Sample.x", "Sample.y")) # 出力: [True, False]
 ```
 
+---
+
 ### revert
 `self, label: str | list[str] | tuple[str, ...] = None, /,`  
 `*,`  
@@ -488,10 +502,10 @@ print(tg.is_registered("Sample.x", "Sample.y")) # 出力: [True, False]
 この状態は、次に `set_trigger()` が呼び出されるまで有効です。  
 指定されたラベルに関連付けられたすべての値が、元に戻されます。
 
-#### all
+#### ***all***
 `True` に設定すると、すべてのラベルを無効にします。
 
-### disable
+### ***disable***
 `True` に設定すると、すべてのラベルを永続的に無効にします。
 
 この状態のラベルは、`set_trigger()` で有効化されません。
@@ -516,7 +530,7 @@ tg.revert("flag", disable=True)
 sample() # 出力: 無効状態
 ```
 
-#### cond
+#### ***cond***
 ラベルを無効にする条件を設定します。
 
 > **⚠️ Note:**  
@@ -526,7 +540,7 @@ sample() # 出力: 無効状態
 > 値が `ブール値` 以外の時 `InvalidArgumentError` が発生します。  
 > 関数呼び出しの場合も同様です。
 
-#### after
+#### ***after***
 ラベルを無効化するまでの遅延時間を秒数で指定します。  
 遅延中に再度指定された場合は上書きされずに、最初の秒数が維持されます。
 
@@ -593,6 +607,8 @@ print(f"User name: {user.name}\nOnline: {user.online}")
 # Online: True
 ```
 
+---
+
 ### exit_point
 `self, func: TrigFunc`  
 `-> Any`
@@ -601,6 +617,8 @@ print(f"User name: {user.name}\nOnline: {user.online}")
 `func` 引数には、対象関数をラップした `TrigFunc` インスタンスを渡す必要があります。
 
 > **Note:** `trigger_return()`が実行されない場合は、この関数を使用する必要はありません。
+
+---
 
 ### trigger_return
 `self, label: str | list[str] | tuple[str, ...], /,`  
@@ -671,6 +689,8 @@ print(value)
 # 戻り値あり
 ```
 
+---
+
 ### trigger_func
 `self, label: str | list[str] | tuple[str, ...], /,`  
 `func: TrigFunc`  
@@ -713,6 +733,8 @@ tg.exit_point("skip", F.func_a())
 # func_b()に到達！
 ```
 
+---
+
 ### TrigFunc
 このクラスは関数の実行を遅延させるために使います。  
 引数なしでインスタンスを作成し、その変数を対象の関数にラップして利用してください。
@@ -728,15 +750,17 @@ tg.exit_point("skip", F.func_a())
 > その変数を通じて `TrigFunc` からメソッドを呼び出してください。  
 > （例: `smp = Sample(10)` → `F.smp.method()`）
 
+---
+
 ### エラー
 
-#### InvalidArgumentError
+#### ***InvalidArgumentError***
 引数の数、または使い方に誤りがある場合に発生します。
 
-#### InvalidClassVarError
+#### ***InvalidClassVarError***
 `switch_var()`でクラス変数をグローバルスコープから登録した場合に発生します。
 
-#### MissingLabelError
+#### ***MissingLabelError***
 設定されたラベルが登録されていない場合に発生します。
 
 ## ライセンス
