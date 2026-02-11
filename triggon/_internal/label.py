@@ -11,12 +11,12 @@ class Label:
     def strip_prefix_symbols( 
         self,
         labels: LabelTypes | KeysView[str],
-        indexes: IndexTypes | None,
+        idxs: IndexTypes | None,
     ) -> tuple[tuple[str, ...], tuple[int, ...]]:
         if isinstance(labels, str):
             labels = (labels,)
-        if isinstance(indexes, int):
-            indexes = (indexes,)
+        if isinstance(idxs, int):
+            idxs = (idxs,)
         
         symbol_counts = []
         stripped_labels = []
@@ -24,7 +24,7 @@ class Label:
         for label in labels:
             stripped_labels.append(label.lstrip(SYMBOL))
             
-            if indexes is not None:
+            if idxs is not None:
                 continue        
             count = 0
             for c in label:
@@ -34,13 +34,13 @@ class Label:
                 symbol_counts.append(count)
                 break
 
-        if indexes is None:
-            indexes = tuple(symbol_counts)
-        elif isinstance(indexes, range):
-            indexes = tuple(indexes)
+        if idxs is None:
+            idxs = tuple(symbol_counts)
+        elif isinstance(idxs, range):
+            idxs = tuple(idxs)
 
-        self._check_value_indexes(stripped_labels, indexes, labels)
-        return tuple(stripped_labels), indexes
+        self._check_value_idxs(stripped_labels, idxs, labels)
+        return tuple(stripped_labels), idxs
 
     def ensure_labels_exist(
             self, 
@@ -55,20 +55,20 @@ class Label:
                 org_label = org_labels[i] if org_labels is not None else None
                 raise UnregisteredLabelError(label, org_label)
 
-    def _check_value_indexes(
+    def _check_value_idxs(
         self, 
         labels: list[str] | KeysView[str], 
-        indexes: tuple[int, ...],
+        idxs: tuple[int, ...],
         org_labels: list[str] | tuple[str, ...],
     ) -> None:
         self.ensure_labels_exist(labels, org_labels)
 
-        if len(labels) != len(indexes):
+        if len(labels) != len(idxs):
             raise InvalidArgumentError(
-                "the number of labels and indexes must be the same"
+                "the number of labels and idxs must be the same"
             )
 
-        for i, label in zip(indexes, labels):
+        for i, label in zip(idxs, labels):
             try:
                 values = self._new_values[label]
             except KeyError:
