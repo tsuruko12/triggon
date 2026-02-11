@@ -7,6 +7,11 @@ from .arg_types import DebugTypes
 
 type EnvTypes = tuple[int, Path | None, tuple[str, ...] | None] | None
 
+LOG_FMT = (
+   "%(asctime)s %(levelname)s "
+   "%(caller_func)s %(caller_file)s:%(caller_line)d - %(message)s"
+)
+
 TRIGGON_LOG_VERBOSITY = "TRIGGON_LOG_VERBOSITY" # 0-3
 TRIGGON_LOG_FILE = "TRIGGON_LOG_FILE"
 TRIGGON_LOG_LABELS = "TRIGGON_LOG_LABELS" # target labels to output
@@ -17,7 +22,7 @@ logger = logging.getLogger(__name__)
 class LogSetup:
    def configure_debug(
          self, 
-         arg: DebugTypes = None, 
+         arg: DebugTypes | None = None, 
          use_env: bool = False
    ) -> None:
       if use_env:
@@ -71,13 +76,13 @@ class LogSetup:
 
       return log_verbosity, file_path, target_labels
 
-   def _read_arg(self, arg: DebugTypes) -> EnvTypes:
+   def _read_arg(self, arg: DebugTypes | None) -> EnvTypes:
       # Default: level 3, terminal output, all labels
       if isinstance(arg, bool):
          if not arg:
             self.debug = False
             return
-         
+         # Env vars take precedence if set
          value = self._read_env()
          if value is None:
             log_verbosity = None
@@ -108,7 +113,7 @@ def _setup_file_handler(file_path) -> None:
       "falling back to terminal output"
    )
 
-   fmt = logging.Formatter(fmt="%(asctime)s - %(message)s")
+   formatter = logging.Formatter(fmt=LOG_FMT)
    try:
       handler = logging.FileHandler(
          filename=file_path, 
@@ -121,7 +126,7 @@ def _setup_file_handler(file_path) -> None:
       return
    else:    
       logger.addHandler(handler)
-      handler.setFormatter(fmt)
+      handler.setFormatter(formatter)
 
       logger.setLevel(logging.DEBUG)
       handler.setLevel(logging.DEBUG)
@@ -131,10 +136,10 @@ def _setup_stream_handler() -> None:
    if logger.handlers:
       return
 
-   fmt = logging.Formatter(fmt="DEBUG - %(message)s")
+   formatter = logging.Formatter(fmt=LOG_FMT)
    handler = logging.StreamHandler()
    logger.addHandler(handler)
-   handler.setFormatter(fmt)
+   handler.setFormatter(formatter)
 
    logger.setLevel(logging.DEBUG)
    handler.setLevel(logging.DEBUG)
