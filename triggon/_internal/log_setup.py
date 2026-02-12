@@ -37,7 +37,7 @@ class LogSetup:
          values = self._read_arg(arg)
 
       if values:
-         (log_verbosity, file_path, target_labels) = values
+         log_verbosity, file_path, target_labels = values
 
          debug_info = {
             TRIGGON_LOG_VERBOSITY: log_verbosity,
@@ -101,14 +101,14 @@ class LogSetup:
             file_path = None
             target_labels = None
          else:
-            (log_verbosity, file_path, target_labels) = value
+            log_verbosity, file_path, target_labels = value
       else:
          if isinstance(arg, str):
             target_labels = (arg,)
          else:
             target_labels = tuple(arg)
          
-         (log_verbosity, file_path, _) = self._read_env()
+         log_verbosity, file_path, _ = self._read_env()
 
       if log_verbosity is None:
          log_verbosity = 3
