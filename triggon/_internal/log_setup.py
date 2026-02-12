@@ -2,11 +2,11 @@ import logging
 import os
 from pathlib import Path
 
-from .arg_types import DebugTypes
+from .arg_types import DebugArg
 from .lock import UPDATE_LOCK
 
 
-type EnvTypes = tuple[int, Path | None, tuple[str, ...] | None]
+type LogConfig = tuple[int, Path | None, tuple[str, ...] | None]
 
 DEBUG_LOG_FMT = (
    "%(asctime)s %(levelname)s "
@@ -28,7 +28,7 @@ logger.setLevel(logging.DEBUG)
 class LogSetup:
    def configure_debug(
          self, 
-         arg: DebugTypes | None = None, 
+         arg: DebugArg | None = None, 
          use_env: bool = False
    ) -> None:
       if use_env:
@@ -57,7 +57,7 @@ class LogSetup:
          else:
             self._setup_file_handler(file_path)
 
-   def _read_env(self) -> EnvTypes | None:
+   def _read_env(self) -> LogConfig | None:
       log_verbosity = os.getenv(TRIGGON_LOG_VERBOSITY)
       if log_verbosity is None:
          log_verbosity = 3
@@ -88,7 +88,7 @@ class LogSetup:
 
       return log_verbosity, file_path, target_labels
 
-   def _read_arg(self, arg: DebugTypes | None) -> EnvTypes | None:
+   def _read_arg(self, arg: DebugArg | None) -> LogConfig | None:
       # Default: level 3, terminal output, all labels
       if isinstance(arg, bool):
          if not arg:
