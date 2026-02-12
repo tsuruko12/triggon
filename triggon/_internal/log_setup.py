@@ -3,20 +3,26 @@ import os
 from pathlib import Path
 
 from .arg_types import DebugTypes
+from .lock import UPDATE_LOCK
 
 
-type EnvTypes = tuple[int, Path | None, tuple[str, ...] | None] | None
+type EnvTypes = tuple[int, Path | None, tuple[str, ...] | None]
 
-LOG_FMT = (
+DEBUG_LOG_FMT = (
    "%(asctime)s %(levelname)s "
    "%(caller_func)s %(caller_file)s:%(caller_line)d - %(message)s"
 )
+WARN_LOG_FMT = "%(asctime)s %(levelname)s - %(message)s"
 
 TRIGGON_LOG_VERBOSITY = "TRIGGON_LOG_VERBOSITY" # 0-3
 TRIGGON_LOG_FILE = "TRIGGON_LOG_FILE"
 TRIGGON_LOG_LABELS = "TRIGGON_LOG_LABELS" # target labels to output
 
-logger = logging.getLogger(__name__)
+_counter = 1
+
+logger = logging.getLogger("triggon")
+logger.propagate=False
+logger.setLevel(logging.DEBUG)
 
 
 class LogSetup:
@@ -40,12 +46,18 @@ class LogSetup:
          }
          self.debug = debug_info
 
-         if file_path is None:
-            _setup_stream_handler()
-         else:
-            _setup_file_handler(file_path)
+         global _counter
+         with UPDATE_LOCK:
+            n = _counter
+            _counter += 1
+         self._logger = logger.getChild(str(n))
 
-   def _read_env(self) -> EnvTypes:
+         if file_path is None:
+            self._setup_stream_handler()
+         else:
+            self._setup_file_handler(file_path)
+
+   def _read_env(self) -> EnvTypes | None:
       log_verbosity = os.getenv(TRIGGON_LOG_VERBOSITY)
       if log_verbosity is None:
          log_verbosity = 3
@@ -76,7 +88,7 @@ class LogSetup:
 
       return log_verbosity, file_path, target_labels
 
-   def _read_arg(self, arg: DebugTypes | None) -> EnvTypes:
+   def _read_arg(self, arg: DebugTypes | None) -> EnvTypes | None:
       # Default: level 3, terminal output, all labels
       if isinstance(arg, bool):
          if not arg:
@@ -104,42 +116,39 @@ class LogSetup:
       return log_verbosity, file_path, target_labels
 
 
-def _setup_file_handler(file_path) -> None:
-   if logger.handlers:
-      return
-   
-   os_err = (
-      "Failed to {proc} the debug log file; " 
-      "falling back to terminal output"
-   )
+   def _setup_file_handler(self, file_path) -> None:
+      try:
+         handler = logging.FileHandler(
+            filename=file_path, 
+            encoding="utf-8", 
+            errors="backslashreplace",
+         )
+      except OSError:
+         self._setup_stream_handler()
+         self._logger.warning(
+            "Failed to create the debug log file; " 
+            "falling back to terminal output"
+         )
+         return
+      else:    
+         handler.setLevel(logging.DEBUG)
+         handler.setFormatter(logging.Formatter(fmt=DEBUG_LOG_FMT))
+         self._logger.addHandler(handler)
 
-   formatter = logging.Formatter(fmt=LOG_FMT)
-   try:
-      handler = logging.FileHandler(
-         filename=file_path, 
-         encoding="utf-8", 
-         errors="backslashreplace",
+
+   def _setup_stream_handler(self) -> None:
+      h_debug = logging.StreamHandler()  
+      h_debug.setLevel(logging.DEBUG)
+      h_debug.addFilter(lambda r: r.levelno == logging.DEBUG)
+      h_debug.setFormatter(
+         logging.Formatter(fmt=DEBUG_LOG_FMT, datefmt="%H:%M:%S")
       )
-   except OSError:
-      _setup_stream_handler()
-      logger.warning(os_err.format(proc="create"))
-      return
-   else:    
-      logger.addHandler(handler)
-      handler.setFormatter(formatter)
 
-      logger.setLevel(logging.DEBUG)
-      handler.setLevel(logging.DEBUG)
+      h_warn = logging.StreamHandler() 
+      h_warn.setLevel(logging.WARNING)
+      h_warn.setFormatter(
+         logging.Formatter(fmt=WARN_LOG_FMT, datefmt="%H:%M:%S")
+      )
 
-
-def _setup_stream_handler() -> None:
-   if logger.handlers:
-      return
-
-   formatter = logging.Formatter(fmt=LOG_FMT)
-   handler = logging.StreamHandler()
-   logger.addHandler(handler)
-   handler.setFormatter(formatter)
-
-   logger.setLevel(logging.DEBUG)
-   handler.setLevel(logging.DEBUG)
+      self._logger.addHandler(h_debug)
+      self._logger.addHandler(h_warn)
