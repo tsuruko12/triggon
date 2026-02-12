@@ -1,7 +1,7 @@
 from typing import KeysView
 
 from ..errors import InvalidArgumentError, UnregisteredLabelError
-from .arg_types import LabelTypes, IndexTypes
+from .arg_types import LabelArg, IndexArg
 
 
 SYMBOL = "*"
@@ -10,8 +10,8 @@ SYMBOL = "*"
 class Label:
     def strip_prefix_symbols( 
         self,
-        labels: LabelTypes | KeysView[str],
-        idxs: IndexTypes | None,
+        labels: LabelArg | KeysView[str],
+        idxs: IndexArg | None,
     ) -> tuple[tuple[str, ...], tuple[int, ...]]:
         if isinstance(labels, str):
             labels = (labels,)
