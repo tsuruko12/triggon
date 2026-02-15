@@ -55,11 +55,11 @@ class Label:
                 org_label = org_labels[i] if org_labels is not None else None
                 raise UnregisteredLabelError(label, org_label)
 
-    def _check_value_idxs(
+    def check_value_idxs(
         self, 
         labels: list[str] | KeysView[str], 
         idxs: tuple[int, ...],
-        org_labels: list[str] | tuple[str, ...],
+        org_labels: list[str] | tuple[str, ...] = None,
     ) -> None:
         self.ensure_labels_exist(labels, org_labels)
 
