@@ -1,12 +1,19 @@
 import logging
 import os
 from pathlib import Path
+from typing import Sequence
 
-from .arg_types import DebugArg
+from ..errors import UnregisteredLabelError
+from .arg_types import (
+   DebugArg, 
+   LogFile, 
+   TargetLabels, 
+   Verbosity,
+)
 from .lock import UPDATE_LOCK
 
 
-type LogConfig = tuple[int, Path | None, tuple[str, ...] | None]
+type LogConfig = tuple[Verbosity, LogFile, TargetLabels]
 
 DEBUG_LOG_FMT = (
    "%(asctime)s %(levelname)s "
@@ -21,43 +28,62 @@ TRIGGON_LOG_LABELS = "TRIGGON_LOG_LABELS" # target labels to output
 _counter = 1
 
 logger = logging.getLogger("triggon")
-logger.propagate=False
+logger.propagate = False
 logger.setLevel(logging.DEBUG)
 
 
 class LogSetup:
    def configure_debug(
          self, 
-         arg: DebugArg | None = None, 
-         use_env: bool = False
+         arg: DebugArg, 
    ) -> None:
-      if use_env:
-          values = self._read_env()
+      # Default: level 3, terminal output, all labels
+      if arg is False:
+         log_verbosity, file_path, target_labels = 0, None, None
+      elif arg is True:
+         log_verbosity, file_path, target_labels = self._read_env()
       else:
-         values = self._read_arg(arg)
+         log_verbosity, file_path, target_labels = self._read_arg(arg)
 
-      if values:
-         log_verbosity, file_path, target_labels = values
-
-         debug_info = {
-            TRIGGON_LOG_VERBOSITY: log_verbosity,
-            TRIGGON_LOG_FILE: file_path,
-            TRIGGON_LOG_LABELS: target_labels,
-         }
-         self.debug = debug_info
-
+      if log_verbosity == 0:
+         self._logger = None
+      else:
          global _counter
          with UPDATE_LOCK:
             n = _counter
             _counter += 1
          self._logger = logger.getChild(str(n))
+         self._logger.propagate = False
 
          if file_path is None:
             self._setup_stream_handler()
          else:
             self._setup_file_handler(file_path)
 
-   def _read_env(self) -> LogConfig | None:
+         if target_labels is not None:
+            valid_labels = []
+            for label in target_labels:
+               try:
+                  self.ensure_labels_exist(label)
+               except UnregisteredLabelError as e:
+                  self._logger.warning("Invalid debug label: %s", e)
+               else:
+                  valid_labels.append(label)
+
+            if not valid_labels:
+               target_labels = None
+            else:
+               target_labels = tuple(valid_labels)
+
+      debug_info = {
+         TRIGGON_LOG_VERBOSITY: log_verbosity,
+         TRIGGON_LOG_FILE: file_path,
+         TRIGGON_LOG_LABELS: target_labels,
+      }
+      self.debug = debug_info
+
+
+   def _read_env(self) -> LogConfig:
       log_verbosity = os.getenv(TRIGGON_LOG_VERBOSITY)
       if log_verbosity is None:
          log_verbosity = 3
@@ -68,53 +94,32 @@ class LogSetup:
             log_verbosity = 3
 
          log_verbosity = min(3, max(0, log_verbosity))
-         if log_verbosity == 0:
-            self.debug = False
-            return
 
-      file_path = os.getenv(TRIGGON_LOG_FILE)
-      if file_path is not None:
-         path = Path(file_path)
-         # will fall back to terminal output on error
-         file_path = path if path.parent.exists() else None
-
-      target_labels = os.getenv(TRIGGON_LOG_LABELS)
-      if target_labels is not None:
-         if "," in target_labels:
-            labels = target_labels.split(",")
-         else:
-            labels = [target_labels]
-         target_labels = tuple(v.strip() for v in labels if v.strip())
-
-      return log_verbosity, file_path, target_labels
-
-   def _read_arg(self, arg: DebugArg | None) -> LogConfig | None:
-      # Default: level 3, terminal output, all labels
-      if isinstance(arg, bool):
-         if not arg:
-            self.debug = False
-            return
-         # Env vars take precedence if set
-         value = self._read_env()
-         if value is None:
-            log_verbosity = None
-            file_path = None
-            target_labels = None
-         else:
-            log_verbosity, file_path, target_labels = value
+      if log_verbosity == 0:
+         # debug off
+         file_path = None
+         target_labels = None
       else:
-         if isinstance(arg, str):
-            target_labels = (arg,)
-         else:
-            target_labels = tuple(arg)
-         
-         log_verbosity, file_path, _ = self._read_env()
+         file_path = os.getenv(TRIGGON_LOG_FILE)
+         if file_path is not None:
+            file_path = Path(file_path)
 
-      if log_verbosity is None:
-         log_verbosity = 3
+         target_labels = os.getenv(TRIGGON_LOG_LABELS)
+         if target_labels is not None:
+            if "," in target_labels:
+               labels = target_labels.split(",")
+            else:
+               labels = [target_labels]
+            target_labels = [v.strip() for v in labels if v.strip()]
 
       return log_verbosity, file_path, target_labels
 
+   def _read_arg(self, target_labels: str | Sequence[str]) -> LogConfig:
+      if isinstance(target_labels, str):
+         target_labels = (target_labels,)
+      log_verbosity, file_path, _ = self._read_env()
+
+      return log_verbosity, file_path, target_labels
 
    def _setup_file_handler(self, file_path) -> None:
       try:
@@ -123,20 +128,22 @@ class LogSetup:
             encoding="utf-8", 
             errors="backslashreplace",
          )
-      except OSError:
+      except OSError as e:
          self._setup_stream_handler()
          self._logger.warning(
-            "Failed to create the debug log file; " 
-            "falling back to terminal output"
+            "Failed to create the debug log file: %s. " 
+            "Falling back to terminal output.",
+            e,
          )
-         return
       else:    
          handler.setLevel(logging.DEBUG)
-         handler.setFormatter(logging.Formatter(fmt=DEBUG_LOG_FMT))
+         handler.setFormatter(
+            LevelSwitchFormatter(DEBUG_LOG_FMT, WARN_LOG_FMT)
+         )
          self._logger.addHandler(handler)
 
-
    def _setup_stream_handler(self) -> None:
+      # create handlers for debug and warning
       h_debug = logging.StreamHandler()  
       h_debug.setLevel(logging.DEBUG)
       h_debug.addFilter(lambda r: r.levelno == logging.DEBUG)
@@ -152,3 +159,23 @@ class LogSetup:
 
       self._logger.addHandler(h_debug)
       self._logger.addHandler(h_warn)
+
+
+class LevelSwitchFormatter(logging.Formatter):
+    def __init__(
+        self,
+        debug_fmt: str,
+        warn_fmt: str,
+        datefmt: str | None = None,
+        warn_level: int = logging.WARNING,
+    ) -> None:
+        super().__init__(datefmt=datefmt)
+        self._warn_level = warn_level
+        self._debug = logging.Formatter(fmt=debug_fmt, datefmt=datefmt)
+        self._warn = logging.Formatter(fmt=warn_fmt,  datefmt=datefmt)
+
+    def format(self, record: logging.LogRecord) -> str:
+        if record.levelno >= self._warn_level:
+            return self._warn.format(record)
+        return self._debug.format(record)
+
