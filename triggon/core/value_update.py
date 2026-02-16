@@ -1,12 +1,16 @@
+from threading import Lock
 from typing import Any
 
 from ..errors import UpdateError
-from .._internal import TRIGGON_LOG_VERBOSITY, UPDATE_LOCK
+from .._internal import TRIGGON_LOG_VERBOSITY
 from .._internal.arg_types import (
     AttrRef,
     Callsite,
     VarRef,
 )
+
+
+UPDATE_LOCK = Lock()
 
 
 class ValueUpdater:
