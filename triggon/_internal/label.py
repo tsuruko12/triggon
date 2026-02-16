@@ -57,11 +57,19 @@ class Label:
 
     def check_value_idxs(
         self, 
-        labels: list[str] | KeysView[str], 
-        idxs: tuple[int, ...],
-        org_labels: list[str] | tuple[str, ...] = None,
+        labels: LabelArg | KeysView[str], 
+        idxs: IndexArg | None,
+        org_labels: list[str] | tuple[str, ...] | None = None,
     ) -> None:
         self.ensure_labels_exist(labels, org_labels)
+
+        if idxs is None:
+            return
+        
+        if isinstance(labels, str):
+            labels = (labels,)
+        if isinstance(idxs, int):
+            idxs = (idxs,)
 
         if len(labels) != len(idxs):
             raise InvalidArgumentError(
@@ -74,6 +82,8 @@ class Label:
             except KeyError:
                 raise UnregisteredLabelError(label)
             else:
+                if i is None:
+                    continue
                 if len(values) - 1 < i:
                     raise IndexError(
                         f"index {i} is out of range for label {label!r}"
