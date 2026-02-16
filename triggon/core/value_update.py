@@ -23,7 +23,9 @@ class ValueUpdater:
 
         var_refs, attr_refs = self._find_update_refs(label, callsite[0])
 
-        # update global variables
+        # Use a global lock for value assignment
+
+        # Update global variables
         for ref in var_refs:
             ref_id, var_name = ref
 
@@ -32,27 +34,27 @@ class ValueUpdater:
                 label_value, 
                 idx, 
                 ref_id,
-            )      
-            try:
-                with UPDATE_LOCK:
+            ) 
+            with UPDATE_LOCK:     
+                try:
                     prev_value = f_globals[var_name]
                     if prev_value == new_value:
                         continue
                     f_globals[var_name] = new_value   
-            except KeyError as e:
-                raise UpdateError(var_name, e) from None
-            else:
-                if debug_on:
-                    self.log_value_update(
-                        label, 
-                        label_idx, 
-                        var_name, 
-                        prev_value,
-                        new_value, 
-                        callsite,
-                    ) 
+                except KeyError as e:
+                    raise UpdateError(var_name, e) from None
+                else:
+                    if debug_on:
+                        self.log_value_update(
+                            label, 
+                            label_idx, 
+                            var_name, 
+                            prev_value,
+                            new_value, 
+                            callsite,
+                        ) 
 
-        # update attributes
+        # Update attributes
         for ref in attr_refs:
             ref_id, attr_name, obj, full_name = ref
 
@@ -62,24 +64,24 @@ class ValueUpdater:
                 idx, 
                 ref_id,
             )   
-            try:
-                with UPDATE_LOCK:
+            with UPDATE_LOCK:
+                try:
                     prev_value = getattr(obj, attr_name)
                     if prev_value == new_value:
                         continue
                     setattr(obj, attr_name, new_value)
-            except (AttributeError, TypeError, ValueError) as e:
-                raise UpdateError(full_name, e) from None
-            else:
-                if debug_on:
-                    self.log_value_update(
-                        label, 
-                        label_idx, 
-                        full_name, 
-                        prev_value,
-                        new_value, 
-                        callsite,
-                    ) 
+                except (AttributeError, TypeError, ValueError) as e:
+                    raise UpdateError(full_name, e) from None
+                else:
+                    if debug_on:
+                        self.log_value_update(
+                            label, 
+                            label_idx, 
+                            full_name, 
+                            prev_value,
+                            new_value, 
+                            callsite,
+                        ) 
 
     def _get_new_value_and_idx(
             self, 
