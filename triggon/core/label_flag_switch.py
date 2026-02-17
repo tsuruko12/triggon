@@ -1,12 +1,11 @@
 from threading import Timer
-from typing import Any
+from typing import Any, Literal
 
 from .._internal import TRIGGON_LOG_VERBOSITY, get_callsite
 from .._internal.arg_types import Callsite
 
 
-TRIGGER = "trigger"
-REVERT = "revert"
+type DelayKey = Literal["trigger", "revert"]
 
 
 class LabelFlagController:
@@ -15,18 +14,18 @@ class LabelFlagController:
             label_to_idx: dict[str, int | None], 
             cond: str | None, 
             after: int | float,
-            api_func: str,
+            api_name: Literal["set_trigger", "revert"],
     ) -> None:
-        frame = self._get_target_frame(api_func)
+        frame = self._get_target_frame(api_name)
         if cond is not None:
             if not self._evaluate_cond(frame, cond):
                 return
         
-        if api_func == "set_trigger":
-            delay_key = TRIGGER
+        if api_name == "set_trigger":
+            delay_key = "trigger"
             set_true = True
         else:
-            delay_key = REVERT   
+            delay_key = "revert" 
             set_true = False
 
         callsite = get_callsite(frame)
@@ -63,7 +62,7 @@ class LabelFlagController:
             label_to_idx: dict[str, int | None], 
             callsite: Callsite,
             after: int | float,
-            delay_key: str,
+            delay_key: DelayKey,
             set_true: bool,
     ) -> None:
         labels = tuple(label_to_idx)
@@ -87,7 +86,7 @@ class LabelFlagController:
             label_to_idx: dict[str, int | None],
             callsite: Callsite,
             f_globals: dict[str, Any],
-            delay_key: str,
+            delay_key: DelayKey,
             set_true: bool,
             is_delay: bool = False,
     ) -> None:
