@@ -33,10 +33,7 @@ logger.setLevel(logging.DEBUG)
 
 
 class LogSetup:
-   def configure_debug(
-         self, 
-         arg: DebugArg, 
-   ) -> None:
+   def configure_debug(self, arg: DebugArg) -> None:
       # Default: level 3, terminal output, all labels
       if arg is False:
          log_verbosity, file_path, target_labels = 0, None, None
