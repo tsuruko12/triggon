@@ -1,16 +1,12 @@
-from threading import Lock
 from typing import Any
 
 from ..errors import UpdateError
-from .._internal import TRIGGON_LOG_VERBOSITY
+from .._internal import TRIGGON_LOG_VERBOSITY, UPDATE_LOCK
 from .._internal.arg_types import (
     AttrRef,
     Callsite,
     VarRef,
 )
-
-
-UPDATE_LOCK = Lock()
 
 
 class ValueUpdater:
@@ -51,11 +47,11 @@ class ValueUpdater:
                     if debug_on:
                         self.log_value_update(
                             label, 
-                            label_idx, 
-                            var_name, 
+                            label_idx,  
                             prev_value,
                             new_value, 
                             callsite,
+                            target_name=var_name,
                         ) 
 
         # Update attributes
@@ -80,11 +76,11 @@ class ValueUpdater:
                     if debug_on:
                         self.log_value_update(
                             label, 
-                            label_idx, 
-                            full_name, 
+                            label_idx,  
                             prev_value,
                             new_value, 
                             callsite,
+                            target_name=full_name,
                         ) 
 
     def _get_new_value_and_idx(
