@@ -7,7 +7,7 @@ from .arg_types import LabelArg, IndexArg
 SYMBOL = "*"
 
 
-class Label:
+class LabelValidator:
     def strip_prefix_symbols( 
         self,
         labels: LabelArg | KeysView[str],
@@ -39,12 +39,12 @@ class Label:
         elif isinstance(idxs, range):
             idxs = tuple(idxs)
 
-        self._check_value_idxs(stripped_labels, idxs, labels)
+        self.check_value_idxs(stripped_labels, idxs, labels)
         return tuple(stripped_labels), idxs
 
     def ensure_labels_exist(
             self, 
-            labels: str| tuple[str, ...] | KeysView[str],
+            labels: str | tuple[str, ...] | KeysView[str],
             org_labels: tuple[str, ...] | KeysView[str] = None,
     ) -> None:
         if isinstance(labels, str):
