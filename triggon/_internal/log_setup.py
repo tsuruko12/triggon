@@ -25,14 +25,14 @@ TRIGGON_LOG_VERBOSITY = "TRIGGON_LOG_VERBOSITY" # 0-3
 TRIGGON_LOG_FILE = "TRIGGON_LOG_FILE"
 TRIGGON_LOG_LABELS = "TRIGGON_LOG_LABELS" # target labels to output
 
-_counter = 1
-
 logger = logging.getLogger("triggon")
 logger.propagate = False
 logger.setLevel(logging.DEBUG)
 
 
 class LogSetup:
+   _counter = 1
+
    def configure_debug(self, arg: DebugArg) -> None:
       # Default: level 3, terminal output, all labels
       if arg is False:
@@ -44,11 +44,10 @@ class LogSetup:
 
       if log_verbosity == 0:
          self._logger = None
-      else:
-         global _counter
+      else:  
          with UPDATE_LOCK:
-            n = _counter
-            _counter += 1
+            n = type(self)._counter
+            type(self)._counter += 1
          self._logger = logger.getChild(str(n))
          self._logger.propagate = False
 
@@ -78,7 +77,6 @@ class LogSetup:
          TRIGGON_LOG_LABELS: target_labels,
       }
       self.debug = debug_info
-
 
    def _read_env(self) -> LogConfig:
       log_verbosity = os.getenv(TRIGGON_LOG_VERBOSITY)
