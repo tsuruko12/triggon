@@ -4,6 +4,9 @@ from typing import Any, Mapping, Self
 from ._core import TrigCall, TrigFuncCore
 
 
+TRIGFUNC_ATTR = "__trigfunc__"
+
+
 class TrigFunc(TrigFuncCore):
     """
     Records attribute and call chains for deferred execution.
