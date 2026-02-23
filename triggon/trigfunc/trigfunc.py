@@ -15,9 +15,9 @@ class TrigFunc(TrigFuncCore):
 
     Examples:
         >>> chain_1 = TrigFunc().func()  
-        >>> F = TrigFunc()
-        >>> chain_2 = F.obj.method(10)
-        >>> chain_3 = F.A(10).method(20)
+        >>> f = TrigFunc()
+        >>> chain_2 = f.obj.method(10)
+        >>> chain_3 = f.A(10).method(20)
 
     Raises:
         TypeError: If a call is recorded before any target is bound.
