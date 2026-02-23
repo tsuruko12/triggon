@@ -1,4 +1,4 @@
-from .trigfunc import TrigFunc
+from .trigfunc import TrigFunc, TRIGFUNC_ATTR
 
 
-__all__ = ["TrigFunc"]
+__all__ = ["TrigFunc", "TRIGFUNC_ATTR"]
