@@ -1,6 +1,7 @@
 from typing import Any
 
 from ..errors import UpdateError
+from ..trigfunc import TRIGFUNC_ATTR
 from .._internal import TRIGGON_LOG_VERBOSITY, UPDATE_LOCK
 from .._internal.arg_types import (
     AttrRef,
@@ -40,7 +41,7 @@ class ValueUpdater:
                     prev_value = f_globals[var_name]
                     if prev_value == new_value:
                         continue
-                    if set_true and hasattr(new_value, "__trigfunc__"):
+                    if set_true and hasattr(new_value, TRIGFUNC_ATTR):
                         f_globals[var_name] = new_value.run() 
                     else:
                         f_globals[var_name] = new_value   
@@ -72,7 +73,7 @@ class ValueUpdater:
                     prev_value = getattr(obj, attr_name)
                     if prev_value == new_value:
                         continue
-                    if set_true and hasattr(new_value, "__trigfunc__"):
+                    if set_true and hasattr(new_value, TRIGFUNC_ATTR):
                         setattr(obj, attr_name, new_value.run())
                     else:
                         setattr(obj, attr_name, new_value)
