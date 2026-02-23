@@ -40,7 +40,10 @@ class ValueUpdater:
                     prev_value = f_globals[var_name]
                     if prev_value == new_value:
                         continue
-                    f_globals[var_name] = new_value   
+                    if set_true and hasattr(new_value, "__trigfunc__"):
+                        f_globals[var_name] = new_value.run() 
+                    else:
+                        f_globals[var_name] = new_value   
                 except KeyError as e:
                     raise UpdateError(var_name, e) from None
                 else:
@@ -69,7 +72,10 @@ class ValueUpdater:
                     prev_value = getattr(obj, attr_name)
                     if prev_value == new_value:
                         continue
-                    setattr(obj, attr_name, new_value)
+                    if set_true and hasattr(new_value, "__trigfunc__"):
+                        setattr(obj, attr_name, new_value.run())
+                    else:
+                        setattr(obj, attr_name, new_value)
                 except (AttributeError, TypeError, ValueError) as e:
                     raise UpdateError(full_name, e) from None
                 else:
