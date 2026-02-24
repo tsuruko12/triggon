@@ -11,13 +11,13 @@ class TrigFunc(TrigFuncCore):
     """
     Records attribute and call chains for deferred execution.
 
-    This class does not execute targets or perform name resolution 
-    or callability checks when building the chain. 
-    Attribute access and calls are recorded as a chain 
+    This class does not execute targets or perform name resolution
+    or callability checks when building the chain.
+    Attribute access and calls are recorded as a chain
     and evaluated only when the chain is executed.
 
     Examples:
-        >>> chain_1 = TrigFunc().func()  
+        >>> chain_1 = TrigFunc().func()
         >>> f = TrigFunc()
         >>> chain_2 = f.obj.method(10)
         >>> chain_3 = f.A(10).method(20)
@@ -27,6 +27,7 @@ class TrigFunc(TrigFuncCore):
         NameError: If a root name cannot be resolved during execution.
         AttributeError: If a root name cannot be resolved during execution.
     """
+
     _trigcall: TrigCall | None
     _f_locals: Mapping[str, Any]
     _f_globals: Mapping[str, Any]
@@ -41,7 +42,7 @@ class TrigFunc(TrigFuncCore):
         self._f_locals = frame.f_locals
         self._f_globals = frame.f_globals
         frame = None
-        
+
     @classmethod
     def _clone_with(
         cls,
