@@ -1,4 +1,3 @@
-from __future__ import annotations
 import builtins
 from dataclasses import dataclass
 from types import FrameType
