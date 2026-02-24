@@ -12,14 +12,13 @@ class LabelFlagController:
     def set_label_flags(
         self,
         label_to_idx: dict[str, int | None],
-        cond: str | None,
+        cond: str,
         after: int | float,
         api_name: Literal["set_trigger", "revert"],
     ) -> None:
         frame = self._get_target_frame(api_name)
-        if cond is not None:
-            if not self._evaluate_cond(frame, cond):
-                return
+        if cond and not self._evaluate_cond(frame, cond):
+            return
 
         if api_name == "set_trigger":
             delay_key = "trigger"
