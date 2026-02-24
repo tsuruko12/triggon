@@ -19,21 +19,21 @@ class TrigFuncCore:
         user_frame = frame.f_back
         if user_frame is None:
             raise FrameAccessError()
-        
+
         return user_frame
-    
+
     def resolve_value(
-            self, 
-            name: str, 
-            obj: Any = _NO_VALUE, 
-            frame: FrameType | None = None,
+        self,
+        name: str,
+        obj: Any = _NO_VALUE,
+        frame: FrameType | None = None,
     ) -> Any:
         if frame is None:
             f_locals = self._f_locals
             f_globals = self._f_globals
         else:
             f_locals = frame.f_locals
-            f_globals = frame.f_globals        
+            f_globals = frame.f_globals
 
         if obj is _NO_VALUE:
             value = f_locals.get(name, _NO_VALUE)
@@ -46,13 +46,10 @@ class TrigFuncCore:
         else:
             value = getattr(obj, name, _NO_VALUE)
             if value is _NO_VALUE:
-                raise AttributeError(
-                    f"{type(obj).__name__!r} object "
-                    f"has no attribute {name!r}"
-                )           
-        
+                raise AttributeError(f"{type(obj).__name__!r} object has no attribute {name!r}")
+
         return value
-    
+
     def run(self) -> Any:
         if self._trigcall is None:
             raise TypeError("no deferred target to execute")
@@ -81,14 +78,14 @@ class TrigFuncCore:
                 # "call"
                 args, kwargs = v[1], v[2]
                 obj = obj(*args, **kwargs)
-                
+
         return obj
-    
+
 
 @dataclass(frozen=True, slots=True)
 class TrigCall:
     target: tuple[AttrArg | CallArg, ...]
-    name: str # only for debug
+    name: str  # only for debug
 
     def add_attr(self, name: str) -> Self:
         return TrigCall(
@@ -97,7 +94,9 @@ class TrigCall:
         )
 
     def add_call(
-            self, args: tuple[Any, ...], kwargs: dict[str, Any],
+        self,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
     ) -> Self:
         return TrigCall(
             self.target + (("call", args, dict(kwargs)),),
