@@ -1,13 +1,14 @@
 import ast
 import inspect
 from types import FrameType
-from typing import Any
+from typing import Any, Literal
 
 from ..errors import InvalidArgumentError
-from .._internal import _NO_VALUE
+from .._internal import ATTR, VAR, _NO_VALUE
 
 
-type AttrResult = tuple[Any, str, Any]  # (value, attr name, parent_obj)
+type VarResult = tuple[Literal["var"], Any] # ('var', value)
+type AttrResult = tuple[Literal["attr"], Any, str, Any]  # ('attr', value, attr name, parent_obj)
 
 
 ALLOWED_FUNCS = {
@@ -150,7 +151,7 @@ def _ensure_allowed_call(node: ast.Call) -> None:
         raise InvalidArgumentError("cond: dynamic calls are not allowed")
 
 
-def resolve_ref_info(target_name: str, frame: FrameType) -> Any | AttrResult:
+def resolve_ref_info(target_name: str, frame: FrameType) -> VarResult | AttrResult:
     if "." in target_name:
         has_attr_chain = True
 
@@ -170,7 +171,7 @@ def resolve_ref_info(target_name: str, frame: FrameType) -> Any | AttrResult:
 
     if has_attr_chain:
         return _walk_attr_chain(full_name, split_names, value)
-    return value
+    return VAR, value
 
 
 def _walk_attr_chain(
@@ -189,4 +190,4 @@ def _walk_attr_chain(
     if inspect.isclass(value):
         raise InvalidArgumentError(f"name {full_name!r} must end with an attribute, not a class")
 
-    return value, split_names[-1], parent_obj
+    return ATTR, value, split_names[-1], parent_obj
