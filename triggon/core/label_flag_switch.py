@@ -29,6 +29,7 @@ class LabelFlagController:
 
         callsite = get_callsite(frame)
         f_globals = frame.f_globals
+        frame = None
 
         # Use a per-instance lock for label flag toggles
 
