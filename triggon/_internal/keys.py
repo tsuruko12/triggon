@@ -1,0 +1,2 @@
+ATTR = "attr"
+VAR = "var"
