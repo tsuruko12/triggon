@@ -9,6 +9,10 @@
 ## Overview
 This library dynamically switches values and functions at labeled trigger points.
 
+> **Warning**
+> The next update will include breaking changes.
+> The `switch_var` API function and some argument names will be changed in the next update.
+
 ## Table of Contents
 - [Installation](#installation)
 - [Usage](#usage)
@@ -22,6 +26,11 @@ This library dynamically switches values and functions at labeled trigger points
 - Trigger early returns with optional return values
 - Call functions at any time
 - Delay execution of almost any library and custom function
+
+## Upcoming Features
+- Add environment-variable-only debug configuration, including verbosity, file output, and target labels
+- Split label and value registration into two class methods: one for a single label and one for multiple labels
+- Support more flexible ways of passing functions and class methods to the deferred-execution class
 
 ## Installation
 ```bash
@@ -347,7 +356,7 @@ example()
 tg = Triggon({"A": True, "B": False})
 
 def sample():
-    # Switch the new value if any label is active.
+    # Switch to the new value if any label is active.
     # If both are active, the earlier one takes priority.
     x = tg.switch_lit(["A", "B"], None)
 
