@@ -2,7 +2,12 @@ from typing import Any
 
 from ..errors import UpdateError
 from ..trigfunc import TRIGFUNC_ATTR
-from .._internal import TRIGGON_LOG_VERBOSITY, UPDATE_LOCK
+from .._internal import (
+    ATTR,
+    TRIGGON_LOG_VERBOSITY,
+    UPDATE_LOCK,
+    VAR,
+)
 from .._internal.arg_types import (
     AttrRef,
     Callsite,
@@ -98,7 +103,7 @@ class ValueUpdater:
         ref_id: int,
     ) -> tuple[Any, int | None]:
         if not set_true:
-            new_value = self._id_meta[ref_id][1]
+            new_value = self._id_meta[ref_id][2]
         else:
             if idx is None:
                 idx = self._get_last_idx(ref_id)
@@ -107,26 +112,22 @@ class ValueUpdater:
         return new_value, idx
 
     def _get_last_idx(self, ref_id: int) -> int:
-        idxs = self._id_meta[ref_id][2]
+        idxs = self._id_meta[ref_id][3]
         return idxs[-1]
 
     def _find_update_refs(
         self,
         label: str,
-        file_name: str,
+        file: str,
     ) -> tuple[list[VarRef], list[AttrRef]]:
         label_refs = self._label_refs[label]
-        var_refs = label_refs["var"]
-        attr_refs = label_refs["attr"]
+        var_refs = label_refs[VAR]
+        attr_refs = label_refs[ATTR]
 
-        target_var_refs = [
-            ref for ref in var_refs if self._is_from_file(ref, file_name)
-        ]
-        target_attr_refs = [
-            ref for ref in attr_refs if self._is_from_file(ref, file_name)
-        ]
+        target_var_refs = [ref for ref in var_refs if self._is_from_file(ref, file)]
+        target_attr_refs = [ref for ref in attr_refs if self._is_from_file(ref, file)]
         return target_var_refs, target_attr_refs
 
-    def _is_from_file(self, ref: VarRef | AttrRef, file_name: str) -> bool:
+    def _is_from_file(self, ref: VarRef | AttrRef, file: str) -> bool:
         ref_id = ref[0]
-        return self._id_meta[ref_id][0] != file_name
+        return self._id_meta[ref_id][0] != file
