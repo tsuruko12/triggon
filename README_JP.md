@@ -1,10 +1,13 @@
 # triggon
-
 [![PyPI](https://img.shields.io/pypi/v/triggon)](https://pypi.org/project/triggon/)
 ![Python](https://img.shields.io/pypi/pyversions/triggon)
 ![Python](https://img.shields.io/pypi/l/triggon)
 ![Package Size](https://img.shields.io/badge/size-31kB-lightgrey)
 [![Downloads](https://pepy.tech/badge/triggon)](https://pepy.tech/project/triggon)
+
+> **警告**
+> 次回のアップデートでは破壊的変更（API変更）を含む予定です。  
+> `switch_var` API関数の名称変更に加え、一部の引数名も変更されます。
 
 # 概要
 このライブラリはラベル付きトリガーポイントで値や関数を動的に切り替えることができます。 
@@ -22,6 +25,11 @@
 - 任意の戻り値で早期リターンが可能
 - 関数を好きなタイミングで呼び出し可能  
 - ほとんどのライブラリ関数やカスタム関数を遅延実行できる  
+
+## 追加予定機能
+- 環境変数で設定できるデバッグ設定を追加（verbosity、ファイル出力、対象ラベル）
+- ラベルと値の登録処理を、単一ラベル用・複数ラベル用の2つのクラスメソッドに分割
+- 遅延実行クラスで、関数やクラスメソッドをより柔軟な方法で渡せるように対応
 
 ## インストール方法
 ```bash
