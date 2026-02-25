@@ -22,7 +22,10 @@ class LabelValidator:
         stripped_labels = []
 
         for label in labels:
-            stripped_labels.append(label.lstrip(SYMBOL))
+            stripped = label.lstrip(SYMBOL)
+            if stripped in stripped_labels:
+                continue
+            stripped_labels.append(stripped)
 
             if idxs is not None:
                 continue
