@@ -5,7 +5,7 @@
 ![Package Size](https://img.shields.io/badge/size-31kB-lightgrey)
 [![Downloads](https://pepy.tech/badge/triggon)](https://pepy.tech/project/triggon)
 
-> **警告**  
+> **警告**:  
 > 次回のアップデートでは破壊的変更（API変更）を含む予定です。  
 > `switch_var` API関数の名称変更に加え、一部の引数名も変更されます。
 
