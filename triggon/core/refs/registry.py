@@ -22,14 +22,14 @@ class RefRegistrar:
                 if isinstance(idxs, int):
                     idxs = (idxs,)
 
-                result, ref_id = self.is_registered_name(
+                ref_id = self.is_registered_name(
                     name,
                     target_ids,
                     target_var_refs,
                     target_attr_refs,
                     callsite.func_name,
                 )
-                if result:
+                if ref_id is not None:
                     new_ids = [i for i in idxs if i not in self._id_meta[ref_id].idxs]
                     if new_ids:
                         self._id_meta[ref_id].idxs.extend(new_ids)
