@@ -12,7 +12,7 @@ type CallArg = tuple[Literal["call"], tuple[Any, ...], dict[str, Any]]
 
 
 # Internal mixin for TrigFunc
-class TrigFuncCore:
+class _Core:
     def get_user_frame(self, name: str) -> FrameType:
         frame = get_target_frame(name)
         user_frame = frame.f_back
@@ -74,7 +74,7 @@ class TrigFuncCore:
                     finally:
                         frame = None
             else:
-                # "call"
+                # 'call'
                 args, kwargs = v[1], v[2]
                 obj = obj(*args, **kwargs)
 
@@ -82,12 +82,12 @@ class TrigFuncCore:
 
 
 @dataclass(frozen=True, slots=True)
-class TrigCall:
+class _TrigCall:
     target: tuple[AttrArg | CallArg, ...]
-    name: str  # only for debug
+    name: str  # Only for debug
 
     def add_attr(self, name: str) -> Self:
-        return TrigCall(
+        return _TrigCall(
             self.target + (("attr", name),),
             f"{self.name}.{name}",
         )
@@ -97,7 +97,7 @@ class TrigCall:
         args: tuple[Any, ...],
         kwargs: dict[str, Any],
     ) -> Self:
-        return TrigCall(
+        return _TrigCall(
             self.target + (("call", args, dict(kwargs)),),
             self.name + "()",
         )
