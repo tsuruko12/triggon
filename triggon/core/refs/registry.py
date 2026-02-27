@@ -1,3 +1,5 @@
+from typing import Mapping
+
 from ..._internal import (
     LOG_VERBOSITY,
     VAR,
@@ -9,7 +11,7 @@ from ..._internal.arg_types import AttrRef, LabelToRefs, RefMeta, VarRef
 
 
 class RefRegistrar:
-    def register_ref_map(self, label_to_refs: LabelToRefs) -> None:
+    def register_ref_map(self, label_to_refs: LabelToRefs, f_globals: Mapping) -> None:
         frame = get_target_frame(("register_ref", "register_refs"))
         callsite = get_callsite(frame)
 
@@ -53,4 +55,6 @@ class RefRegistrar:
                 self._latest_id += 1
 
                 if self.debug[LOG_VERBOSITY] == 3:
-                    self.log_registered_name(value, callsite)
+                    self.log_registered_name(value, callsite)       
+                if self._label_is_active[label]:
+                    self.update_values(label, idx, f_globals, callsite, set_true=True)
