@@ -30,25 +30,27 @@ class RefLookup:
 
         return tuple(matched_var_refs), tuple(matched_attr_refs)
 
-    def find_registered_id(
+    def is_registered_name(
         self,
         target_name: str,
         target_ids: set[int],
         target_var_refs: tuple[VarRef, ...],
         target_attr_refs: tuple[AttrRef, ...],
         func_name: str,
-    ) -> int | None:
+    ) -> True:
         for ref in target_var_refs:
             if ref.var_name != target_name:
                 continue
             if ref.ref_id in target_ids:
-                return ref.ref_id
+                return True
 
         for ref in target_attr_refs:
             if ref.full_name != target_name:
                 continue
             # Attr names can collide; check func_name too
-            if ref.ref_id in target_ids and self._id_meta[ref.ref_id].func_name == func_name:
-                return ref.ref_id
+            if ref.ref_id not in target_ids:
+                continue
+            if self._id_meta[ref.ref_id].func_name == func_name:
+                return True
 
-        return None
+        return False
