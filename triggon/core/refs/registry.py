@@ -15,24 +15,18 @@ class RefRegistrar:
 
         target_ids = self.get_matched_ids(callsite.file)
 
-        for label, name_to_idxs in label_to_refs.items():
+        for label, name_to_idx in label_to_refs.items():
             target_var_refs, target_attr_refs = self.get_matched_refs(label)
 
-            for name, idxs in name_to_idxs.items():
-                if isinstance(idxs, int):
-                    idxs = (idxs,)
-
-                ref_id = self.is_registered_name(
+            for name, idx in name_to_idx.items():
+                registered = self.is_registered_name(
                     name,
                     target_ids,
                     target_var_refs,
                     target_attr_refs,
                     callsite.func_name,
                 )
-                if ref_id is not None:
-                    new_ids = [i for i in idxs if i not in self._id_meta[ref_id].idxs]
-                    if new_ids:
-                        self._id_meta[ref_id].idxs.extend(new_ids)
+                if registered:
                     continue
 
                 ref = resolve_ref_info(name, frame)
@@ -54,7 +48,7 @@ class RefRegistrar:
                     file=callsite.file,
                     func_name=callsite.func_name,
                     orig_val=value,
-                    idxs=list(idxs),
+                    idx=idx,
                 )
                 self._latest_id += 1
 
