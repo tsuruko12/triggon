@@ -19,7 +19,9 @@ class RefRegistrar:
             target_var_refs, target_attr_refs = self.get_matched_refs(label)
 
             for name, idxs in name_to_idxs.items():
-                # idxs is a tuple
+                if isinstance(idxs, int):
+                    idxs = (idxs,)
+
                 result, ref_id = self.is_registered_name(
                     name,
                     target_ids,
