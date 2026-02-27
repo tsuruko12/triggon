@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Mapping
 
 from ..errors import UpdateError
 from ..trigfunc import TRIGFUNC_ATTR
@@ -20,7 +20,7 @@ class ValueUpdater:
         self,
         label: str,
         idx: int | None,
-        f_globals: dict[str, Any],
+        f_globals: Mapping[str, Any],
         callsite: Callsite,
         set_true: bool,
     ) -> None:
