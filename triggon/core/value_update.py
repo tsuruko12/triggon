@@ -102,14 +102,10 @@ class ValueUpdater:
             new_value = self._id_meta[ref_id].orig_val
         else:
             if idx is None:
-                idx = self._get_last_idx(ref_id)
+                idx = self._id_meta[ref_id].idx
             new_value = label_value[idx]
 
         return new_value, idx
-
-    def _get_last_idx(self, ref_id: int) -> int:
-        idxs = self._id_meta[ref_id].idxs
-        return idxs[-1]
 
     def _find_update_refs(
         self,
