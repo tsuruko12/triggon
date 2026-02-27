@@ -15,10 +15,10 @@ class RefRegistrar:
         frame = get_target_frame(("register_ref", "register_refs"))
         callsite = get_callsite(frame)
 
-        target_ids = self.get_matched_ids(callsite.file)
+        target_ids = self.get_ids_by_file(callsite.file)
 
         for label, name_to_idx in label_to_refs.items():
-            target_var_refs, target_attr_refs = self.get_matched_refs(label)
+            target_var_refs, target_attr_refs = self.get_refs(label)
 
             for name, idx in name_to_idx.items():
                 registered = self.is_registered_name(
