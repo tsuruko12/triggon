@@ -21,19 +21,19 @@ class RefRegistrar:
             target_var_refs, target_attr_refs = self.get_refs(label)
 
             for name, idx in name_to_idx.items():
-                registered = self.is_registered_name(
-                    name,
-                    target_ids,
-                    target_var_refs,
-                    target_attr_refs,
-                    callsite.func_name,
-                )
-                if registered:
-                    continue
-
-                ref = resolve_ref_info(name, frame)
-
                 with self._lock:
+                    registered = self.is_registered_name(
+                        name,
+                        target_ids,
+                        target_var_refs,
+                        target_attr_refs,
+                        callsite.func_name,
+                    )
+                    if registered:
+                        continue
+
+                    ref = resolve_ref_info(name, frame)
+
                     if ref[0] == VAR:
                         kind, value = ref
                         save_ref = VarRef(ref_id=self._latest_id, var_name=name)
