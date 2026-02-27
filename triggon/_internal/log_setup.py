@@ -20,9 +20,9 @@ DEBUG_LOG_FMT = (
 )
 WARN_LOG_FMT = "%(asctime)s %(levelname)s - %(message)s"
 
-TRIGGON_LOG_VERBOSITY = "TRIGGON_LOG_VERBOSITY"  # 0-3
-TRIGGON_LOG_FILE = "TRIGGON_LOG_FILE"
-TRIGGON_LOG_LABELS = "TRIGGON_LOG_LABELS"  # target labels to output
+LOG_VERBOSITY = "TRIGGON_LOG_VERBOSITY"  # 0-3
+LOG_FILE = "TRIGGON_LOG_FILE"
+LOG_LABELS = "TRIGGON_LOG_LABELS"  # target labels to output
 
 logger = logging.getLogger("triggon")
 logger.propagate = False
@@ -71,14 +71,14 @@ class LogSetup:
                     target_labels = tuple(valid_labels)
 
         debug_info = {
-            TRIGGON_LOG_VERBOSITY: log_verbosity,
-            TRIGGON_LOG_FILE: file_path,
-            TRIGGON_LOG_LABELS: target_labels,
+            LOG_VERBOSITY: log_verbosity,
+            LOG_FILE: file_path,
+            LOG_LABELS: target_labels,
         }
         self.debug = debug_info
 
     def _read_env(self) -> LogConfig:
-        log_verbosity = os.getenv(TRIGGON_LOG_VERBOSITY)
+        log_verbosity = os.getenv(LOG_VERBOSITY)
         if log_verbosity is None:
             log_verbosity = 3
         else:
@@ -94,11 +94,11 @@ class LogSetup:
             file_path = None
             target_labels = None
         else:
-            file_path = os.getenv(TRIGGON_LOG_FILE)
+            file_path = os.getenv(LOG_FILE)
             if file_path is not None:
                 file_path = Path(file_path)
 
-            target_labels = os.getenv(TRIGGON_LOG_LABELS)
+            target_labels = os.getenv(LOG_LABELS)
             if target_labels is not None:
                 if "," in target_labels:
                     labels = target_labels.split(",")
