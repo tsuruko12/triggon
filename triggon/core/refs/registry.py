@@ -32,29 +32,31 @@ class RefRegistrar:
                     continue
 
                 ref = resolve_ref_info(name, frame)
-                if ref[0] == VAR:
-                    kind, value = ref
-                    save_ref = VarRef(ref_id=self._latest_id, var_name=name)
-                else:
-                    # 'attr'
-                    kind, value, attr_name, parent_obj = ref
-                    save_ref = AttrRef(
-                        ref_id=self._latest_id,
-                        attr_name=attr_name,
-                        parent_obj=parent_obj,
-                        full_name=name,
-                    )
 
-                self._label_refs[label][kind].append(save_ref)
-                self._id_meta[self._latest_id] = RefMeta(
-                    file=callsite.file,
-                    func_name=callsite.func_name,
-                    orig_val=value,
-                    idx=idx,
-                )
-                self._latest_id += 1
+                with self._lock:
+                    if ref[0] == VAR:
+                        kind, value = ref
+                        save_ref = VarRef(ref_id=self._latest_id, var_name=name)
+                    else:
+                        # 'attr'
+                        kind, value, attr_name, parent_obj = ref
+                        save_ref = AttrRef(
+                            ref_id=self._latest_id,
+                            attr_name=attr_name,
+                            parent_obj=parent_obj,
+                            full_name=name,
+                        )
+
+                    self._label_refs[label][kind].append(save_ref)
+                    self._id_meta[self._latest_id] = RefMeta(
+                        file=callsite.file,
+                        func_name=callsite.func_name,
+                        orig_val=value,
+                        idx=idx,
+                    )
+                    self._latest_id += 1
 
                 if self.debug[LOG_VERBOSITY] == 3:
-                    self.log_registered_name(value, callsite)       
+                    self.log_registered_name(value, callsite)
                 if self._label_is_active[label]:
                     self.update_values(label, idx, f_globals, callsite, set_true=True)
