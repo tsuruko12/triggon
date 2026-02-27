@@ -1,7 +1,7 @@
 from threading import Timer
 from typing import Any, Literal, Mapping
 
-from .._internal import LOG_VERBOSITY, get_callsite
+from .._internal import LOG_VERBOSITY, get_callsite, get_target_frame
 from .._internal.arg_types import Callsite
 
 
@@ -16,7 +16,7 @@ class LabelFlagController:
         after: int | float,
         set_true: bool,
     ) -> None:
-        frame = self._get_target_frame(depth=1)
+        frame = get_target_frame(depth=1)
         if cond and not self._evaluate_cond(frame, cond):
             return
 
