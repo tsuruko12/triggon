@@ -1,13 +1,13 @@
 from __future__ import annotations
 from typing import Any, Mapping, Self
 
-from ._core import TrigCall, TrigFuncCore
+from ._core import _TrigCall, _Core
 
 
 TRIGFUNC_ATTR = "__trigfunc__"
 
 
-class TrigFunc(TrigFuncCore):
+class TrigFunc(_Core):
     """
     Records attribute and call chains for deferred execution.
 
@@ -28,7 +28,7 @@ class TrigFunc(TrigFuncCore):
         AttributeError: If a root name cannot be resolved during execution.
     """
 
-    _trigcall: TrigCall | None
+    _trigcall: _TrigCall | None
     _f_locals: Mapping[str, Any]
     _f_globals: Mapping[str, Any]
 
@@ -46,7 +46,7 @@ class TrigFunc(TrigFuncCore):
     @classmethod
     def _clone_with(
         cls,
-        tricall: TrigCall,
+        tricall: _TrigCall,
         f_locals: Mapping[str, Any],
         f_globals: Mapping[str, Any],
     ) -> Self:
@@ -69,7 +69,7 @@ class TrigFunc(TrigFuncCore):
 
     def __getattr__(self, name: str) -> Self:
         if self._trigcall is None:
-            new_trigcall = TrigCall((("attr", name),), name)
+            new_trigcall = _TrigCall((("attr", name),), name)
         else:
             new_trigcall = self._trigcall.add_attr(name)
 
