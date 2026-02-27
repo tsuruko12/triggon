@@ -4,7 +4,7 @@ from ..errors import UpdateError
 from ..trigfunc import TRIGFUNC_ATTR
 from .._internal import (
     ATTR,
-    TRIGGON_LOG_VERBOSITY,
+    LOG_VERBOSITY,
     UPDATE_LOCK,
     VAR,
 )
@@ -24,34 +24,32 @@ class ValueUpdater:
         callsite: Callsite,
         set_true: bool,
     ) -> None:
-        debug_on = self.debug[TRIGGON_LOG_VERBOSITY] > 1
+        debug_on = self.debug[LOG_VERBOSITY] > 1
         label_value = self._new_values[label]
 
-        var_refs, attr_refs = self._find_update_refs(label, callsite[0])
+        var_refs, attr_refs = self._find_update_refs(label, callsite.file)
 
         # Use a global lock for value assignment
 
         # Update global variables
         for ref in var_refs:
-            ref_id, var_name = ref
-
             new_value, label_idx = self._get_new_value_and_idx(
                 set_true,
                 label_value,
                 idx,
-                ref_id,
+                ref.ref_id,
             )
             with UPDATE_LOCK:
                 try:
-                    prev_value = f_globals[var_name]
+                    prev_value = f_globals[ref.var_name]
                     if prev_value == new_value:
                         continue
                     if set_true and hasattr(new_value, TRIGFUNC_ATTR):
-                        f_globals[var_name] = new_value.run()
+                        f_globals[ref.var_name] = new_value.run()
                     else:
-                        f_globals[var_name] = new_value
+                        f_globals[ref.var_name] = new_value
                 except KeyError as e:
-                    raise UpdateError(var_name, e) from None
+                    raise UpdateError(ref.var_name, e) from None
                 else:
                     if debug_on:
                         self.log_value_update(
@@ -60,30 +58,28 @@ class ValueUpdater:
                             prev_value,
                             new_value,
                             callsite,
-                            target_name=var_name,
+                            target_name=ref.var_name,
                         )
 
         # Update attributes
         for ref in attr_refs:
-            ref_id, attr_name, obj, full_name = ref
-
             new_value, label_idx = self._get_new_value_and_idx(
                 set_true,
                 label_value,
                 idx,
-                ref_id,
+                ref.ref_id,
             )
             with UPDATE_LOCK:
                 try:
-                    prev_value = getattr(obj, attr_name)
+                    prev_value = getattr(ref.parent_obj, ref.attr_name)
                     if prev_value == new_value:
                         continue
                     if set_true and hasattr(new_value, TRIGFUNC_ATTR):
-                        setattr(obj, attr_name, new_value.run())
+                        setattr(ref.parent_obj, ref.attr_name, new_value.run())
                     else:
-                        setattr(obj, attr_name, new_value)
+                        setattr(ref.parent_obj, ref.attr_name, new_value)
                 except (AttributeError, TypeError, ValueError) as e:
-                    raise UpdateError(full_name, e) from None
+                    raise UpdateError(ref.full_name, e) from None
                 else:
                     if debug_on:
                         self.log_value_update(
@@ -92,7 +88,7 @@ class ValueUpdater:
                             prev_value,
                             new_value,
                             callsite,
-                            target_name=full_name,
+                            target_name=ref.full_name,
                         )
 
     def _get_new_value_and_idx(
@@ -103,7 +99,7 @@ class ValueUpdater:
         ref_id: int,
     ) -> tuple[Any, int | None]:
         if not set_true:
-            new_value = self._id_meta[ref_id][2]
+            new_value = self._id_meta[ref_id].orig_val
         else:
             if idx is None:
                 idx = self._get_last_idx(ref_id)
@@ -112,7 +108,7 @@ class ValueUpdater:
         return new_value, idx
 
     def _get_last_idx(self, ref_id: int) -> int:
-        idxs = self._id_meta[ref_id][3]
+        idxs = self._id_meta[ref_id].idxs
         return idxs[-1]
 
     def _find_update_refs(
@@ -124,10 +120,6 @@ class ValueUpdater:
         var_refs = label_refs[VAR]
         attr_refs = label_refs[ATTR]
 
-        target_var_refs = [ref for ref in var_refs if self._is_from_file(ref, file)]
-        target_attr_refs = [ref for ref in attr_refs if self._is_from_file(ref, file)]
+        target_var_refs = [ref for ref in var_refs if self._id_meta[ref.ref_id].file != file]
+        target_attr_refs = [ref for ref in attr_refs if self._id_meta[ref.ref_id].file != file]
         return target_var_refs, target_attr_refs
-
-    def _is_from_file(self, ref: VarRef | AttrRef, file: str) -> bool:
-        ref_id = ref[0]
-        return self._id_meta[ref_id][0] != file
