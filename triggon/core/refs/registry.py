@@ -12,7 +12,7 @@ from ..._internal.arg_types import AttrRef, LabelToRefs, RefMeta, VarRef
 
 class RefRegistrar:
     def register_ref_map(self, label_to_refs: LabelToRefs, f_globals: Mapping) -> None:
-        frame = get_target_frame(("register_ref", "register_refs"))
+        frame = get_target_frame()
         callsite = get_callsite(frame)
 
         target_ids = self.get_ids_by_file(callsite.file)
