@@ -14,18 +14,16 @@ class LabelFlagController:
         label_to_idx: dict[str, int | None],
         cond: str,
         after: int | float,
-        api_name: Literal["set_trigger", "revert"],
+        set_true: bool,
     ) -> None:
-        frame = self._get_target_frame(api_name)
+        frame = self._get_target_frame(depth=1)
         if cond and not self._evaluate_cond(frame, cond):
             return
 
-        if api_name == "set_trigger":
+        if set_true:
             delay_key = "trigger"
-            set_true = True
         else:
             delay_key = "revert"
-            set_true = False
 
         callsite = get_callsite(frame)
         f_globals = frame.f_globals
