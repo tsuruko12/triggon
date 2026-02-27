@@ -38,7 +38,7 @@ class TrigFunc(_Core):
     def __init__(self) -> None:
         self._trigcall = None
 
-        frame = self.get_user_frame("__init__")
+        frame = self.get_user_frame()
         self._f_locals = frame.f_locals
         self._f_globals = frame.f_globals
         frame = None
