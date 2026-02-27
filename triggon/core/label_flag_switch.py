@@ -1,7 +1,7 @@
 from threading import Timer
-from typing import Any, Literal
+from typing import Any, Literal, Mapping
 
-from .._internal import TRIGGON_LOG_VERBOSITY, get_callsite
+from .._internal import LOG_VERBOSITY, get_callsite
 from .._internal.arg_types import Callsite
 
 
@@ -68,7 +68,7 @@ class LabelFlagController:
     ) -> None:
         labels = tuple(label_to_idx)
 
-        debug_on = self.debug[TRIGGON_LOG_VERBOSITY] == 3
+        debug_on = self.debug[LOG_VERBOSITY] == 3
 
         for label in labels:
             with self._lock:
@@ -89,12 +89,12 @@ class LabelFlagController:
         self,
         label_to_idx: dict[str, int | None],
         callsite: Callsite,
-        f_globals: dict[str, Any],
+        f_globals: Mapping[str, Any],
         delay_key: DelayKey,
         set_true: bool,
         is_delay: bool = False,
     ) -> None:
-        debug_on = self.debug[TRIGGON_LOG_VERBOSITY] != 0
+        debug_on = self.debug[LOG_VERBOSITY] != 0
 
         for label, i in label_to_idx.items():
             with self._lock:
