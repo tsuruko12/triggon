@@ -37,7 +37,7 @@ class RefLookup:
         target_var_refs: tuple[VarRef, ...],
         target_attr_refs: tuple[AttrRef, ...],
         func_name: str,
-    ) -> True:
+    ) -> bool:
         for ref in target_var_refs:
             if ref.var_name != target_name:
                 continue
@@ -47,9 +47,9 @@ class RefLookup:
         for ref in target_attr_refs:
             if ref.full_name != target_name:
                 continue
-            # Attr names can collide; check func_name too
             if ref.ref_id not in target_ids:
                 continue
+            # Attr names can collide; check func_name too
             if self._id_meta[ref.ref_id].func_name == func_name:
                 return True
 
