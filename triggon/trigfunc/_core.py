@@ -13,8 +13,8 @@ type CallArg = tuple[Literal["call"], tuple[Any, ...], dict[str, Any]]
 
 # Internal mixin for TrigFunc
 class _Core:
-    def get_user_frame(self, name: str) -> FrameType:
-        frame = get_target_frame(name)
+    def get_user_frame(self) -> FrameType:
+        frame = get_target_frame(depth=1)
         user_frame = frame.f_back
         if user_frame is None:
             raise FrameAccessError()
@@ -66,7 +66,7 @@ class _Core:
                 except NameError:
                     # Retry using the current user frame
                     try:
-                        frame = self.get_user_frame("run")
+                        frame = self.get_user_frame()
                         if obj is _NO_VALUE:
                             obj = self.resolve_value(name, frame=frame)
                         else:
