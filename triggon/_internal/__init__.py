@@ -8,7 +8,9 @@ from .utils import to_dict
 
 
 all = [
+    "ATTR",
     "LOG_VERBOSITY",
+    "VAR",
     "UPDATE_LOCK",
     "_Internal",
     "_NO_VALUE",
