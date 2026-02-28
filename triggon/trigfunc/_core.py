@@ -3,8 +3,9 @@ from dataclasses import dataclass
 from types import FrameType
 from typing import Any, Literal, Self
 
-from ..errors import FrameAccessError
-from .._internal import _NO_VALUE, get_target_frame
+from ..errors.public import FrameAccessError
+from .._internal import _NO_VALUE
+from .._internal.frames import get_target_frame
 
 
 type AttrArg = tuple[Literal["attr"], str]
