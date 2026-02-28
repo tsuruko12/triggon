@@ -1,4 +1,3 @@
-from __future__ import annotations
 from typing import Any, Mapping, Self
 
 from ._core import _TrigCall, _Core
