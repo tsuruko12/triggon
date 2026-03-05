@@ -1,10 +1,13 @@
 from ..._internal import VAR
-from ..._internal.arg_types import AttrRef, VarRef
+from ..._internal._types.structs import AttrRef, RefMeta, RefsByKind, VarRef
 
 
 class RefLookup:
+    _label_refs: dict[str, RefsByKind]
+    _id_meta: dict[int, RefMeta]
+
     def get_ids_by_file(self, file: str) -> set[int]:
-        # Return ref_ids for the given file
+        # return ref_ids for the given file
         return {ref_id for ref_id, meta in self._id_meta.items() if meta.file == file}
 
     def get_refs(
@@ -12,7 +15,6 @@ class RefLookup:
         label: str | None = None,
     ) -> tuple[tuple[VarRef, ...], tuple[AttrRef, ...]]:
         if label is not None:
-            self.ensure_labels_exist(label)
             target_values = [self._label_refs[label]]
         else:
             target_values = [refs for refs in self._label_refs.values()]
@@ -49,7 +51,7 @@ class RefLookup:
                 continue
             if ref.ref_id not in target_ids:
                 continue
-            # Attr names can collide; check func_name too
+            # attr names can collide; check func_name too
             if self._id_meta[ref.ref_id].func_name == func_name:
                 return True
 
