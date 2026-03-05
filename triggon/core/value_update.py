@@ -1,26 +1,46 @@
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 
-from ..errors import UpdateError
-from ..trigfunc import TRIGFUNC_ATTR
 from .._internal import (
     ATTR,
     LOG_VERBOSITY,
     UPDATE_LOCK,
     VAR,
 )
-from .._internal.arg_types import (
+from .._internal._types.structs import (
     AttrRef,
     Callsite,
+    DebugConfig,
+    RefMeta,
+    RefsByKind,
     VarRef,
 )
+from ..errors.public import UpdateError
+from ..trigfunc import TRIGFUNC_ATTR
 
 
 class ValueUpdater:
+    debug: DebugConfig
+    _new_values: Mapping[str, tuple[Any, ...]]
+    _label_refs: dict[str, RefsByKind]
+    _id_meta: dict[int, RefMeta]
+
+    if TYPE_CHECKING:
+
+        def log_value_update(
+            self,
+            label: str | None,
+            idx: int | None,
+            prev_value: Any,
+            new_value: Any,
+            callsite: Callsite,
+            target_name: str | None = None,
+        ) -> None: ...
+
     def update_values(
         self,
         label: str,
         idx: int | None,
-        f_globals: Mapping[str, Any],
+        f_globals: dict[str, Any],
         callsite: Callsite,
         set_true: bool,
     ) -> None:
@@ -29,9 +49,9 @@ class ValueUpdater:
 
         var_refs, attr_refs = self._find_update_refs(label, callsite.file)
 
-        # Use a global lock for value assignment
+        # use a global lock for value assignment
 
-        # Update global variables
+        # update global variables
         for ref in var_refs:
             new_value, label_idx = self._get_new_value_and_idx(
                 set_true,
@@ -61,7 +81,7 @@ class ValueUpdater:
                             target_name=ref.var_name,
                         )
 
-        # Update attributes
+        # update attributes
         for ref in attr_refs:
             new_value, label_idx = self._get_new_value_and_idx(
                 set_true,
@@ -118,4 +138,5 @@ class ValueUpdater:
 
         target_var_refs = [ref for ref in var_refs if self._id_meta[ref.ref_id].file != file]
         target_attr_refs = [ref for ref in attr_refs if self._id_meta[ref.ref_id].file != file]
+
         return target_var_refs, target_attr_refs
