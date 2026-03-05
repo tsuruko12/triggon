@@ -1,89 +1,92 @@
-from typing import KeysView
+from typing import Any, KeysView, Mapping, Sequence, ValuesView
 
-from ..errors import InvalidArgumentError, UnregisteredLabelError
-from .arg_types import LabelArg, IndexArg
+from ..errors.public import InvalidArgumentError, UnregisteredLabelError
+from ._types import IndexArg, LabelArg
 
 
 SYMBOL = "*"
 
 
 class LabelValidator:
-    def strip_prefix_symbols(
+    _new_values: Mapping[str, tuple[Any, ...]]
+
+    def resolve_labels_and_idxs(
         self,
         labels: LabelArg | KeysView[str],
-        idxs: IndexArg | None,
+        idxs: IndexArg | ValuesView[int] | None,
+        allow_symbol: bool = True,
+        is_init: bool = False,
     ) -> tuple[tuple[str, ...], tuple[int, ...]]:
         if isinstance(labels, str):
             labels = (labels,)
         if isinstance(idxs, int):
             idxs = (idxs,)
 
+        orig_labels = tuple(labels)  # keep original labels before stripping
+
+        labels, counts = self._strip_prefix_symbols(labels, allow_symbol)
+
+        if idxs is None:
+            # use symbol counts as idxs
+            check_idx_range = False
+            idxs = counts
+        else:
+            check_idx_range = True
+
+        assert isinstance(idxs, Sequence)
+
+        for i, label in enumerate(labels):
+            _validate_label(label)
+
+            if is_init:
+                continue
+
+            self.ensure_labels_exist(label, orig_labels[i])
+            if check_idx_range:
+                self._validate_idx_range(label, idxs[i])
+
+        return tuple(labels), tuple(idxs)
+
+    def _strip_prefix_symbols(
+        self,
+        labels: Sequence[str] | KeysView[str],
+        allow_symbol: bool,
+    ) -> tuple[list[str], list[int]]:
         symbol_counts = []
         stripped_labels = []
+        seen_labels = set()
 
         for label in labels:
             stripped = label.lstrip(SYMBOL)
-            if stripped in stripped_labels:
+            if stripped in seen_labels:
                 continue
             stripped_labels.append(stripped)
+            seen_labels.add(stripped)
 
-            if idxs is not None:
-                continue
-            count = 0
-            for c in label:
-                if c == SYMBOL:
-                    count += 1
+            prefix_count = 0
+            for ch in label:
+                if ch == SYMBOL:
+                    if not allow_symbol:
+                        raise InvalidArgumentError(
+                            f"remove the leading {SYMBOL!r} characters from {label!r}"
+                        )
+                    prefix_count += 1
                     continue
-                symbol_counts.append(count)
                 break
+            symbol_counts.append(prefix_count)
 
-        if idxs is None:
-            idxs = tuple(symbol_counts)
-        elif isinstance(idxs, range):
-            idxs = tuple(idxs)
+        return stripped_labels, symbol_counts
 
-        self.check_value_idxs(stripped_labels, idxs, labels)
-        return tuple(stripped_labels), idxs
+    def ensure_labels_exist(self, label: str, orig_label: str | None = None) -> None:
+        if label not in self._new_values:
+            raise UnregisteredLabelError(label, orig_label)
 
-    def ensure_labels_exist(
-        self,
-        labels: str | tuple[str, ...] | KeysView[str],
-        org_labels: tuple[str, ...] | KeysView[str] = None,
-    ) -> None:
-        if isinstance(labels, str):
-            labels = (labels,)
+    def _validate_idx_range(self, label: str, idx: int) -> None:
+        label_values = self._new_values[label]
+        if len(label_values) - 1 < idx:
+            raise IndexError(f"index {idx} is out of range for label {label!r}")
 
-        for i, label in enumerate(labels):
-            if label not in self._new_values:
-                org_label = org_labels[i] if org_labels is not None else None
-                raise UnregisteredLabelError(label, org_label)
 
-    def check_value_idxs(
-        self,
-        labels: LabelArg | KeysView[str],
-        idxs: IndexArg | None,
-        org_labels: list[str] | tuple[str, ...] | None = None,
-    ) -> None:
-        self.ensure_labels_exist(labels, org_labels)
-
-        if idxs is None:
-            return
-
-        if isinstance(labels, str):
-            labels = (labels,)
-        if isinstance(idxs, int):
-            idxs = (idxs,)
-
-        if len(labels) != len(idxs):
-            raise InvalidArgumentError("the number of labels and idxs must be the same")
-
-        for i, label in zip(idxs, labels):
-            try:
-                values = self._new_values[label]
-            except KeyError:
-                raise UnregisteredLabelError(label)
-            else:
-                if i is None:
-                    continue
-                if len(values) - 1 < i:
-                    raise IndexError(f"index {i} is out of range for label {label!r}")
+def _validate_label(label: str) -> None:
+    if not label or any(ch.isspace() for ch in label):
+        raise InvalidArgumentError(f"label must not be empty or contain whitespace: {label!r}")
