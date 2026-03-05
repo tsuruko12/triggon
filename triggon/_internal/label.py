@@ -1,8 +1,7 @@
 from typing import Any, KeysView, Mapping, Sequence, ValuesView
 
 from ..errors.public import InvalidArgumentError, UnregisteredLabelError
-from ._types import IndexArg, LabelArg
-
+from ._types.aliases import IndexArg, LabelArg
 
 SYMBOL = "*"
 
