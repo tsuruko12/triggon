@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Sequence
 
 from ..errors.public import UnregisteredLabelError
-from .arg_types import (
-    DebugArg,
+from ._types.aliases import DebugArg
+from ._types.structs import (
     DebugConfig,
     LogFile,
     TargetLabels,
