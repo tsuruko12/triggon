@@ -1,7 +1,12 @@
+from typing import Any, KeysView, Sequence
+
+from .arg_types import RevertMap, TriggerMap
+
+
 def to_dict(
-    keys: tuple[str, ...],
+    keys: tuple[str, ...] | KeysView,
     values: tuple[str | int, ...] | None,
-) -> dict[str, str | int | None]:
+) -> TriggerMap | RevertMap:
     if values is None:
         values_iter = (None,) * len(keys)
     else:
@@ -12,3 +17,11 @@ def to_dict(
         label_values[key] = val
 
     return label_values
+
+
+def unwrap_value(value: tuple[Any, ...]) -> Sequence[str]:
+    n = len(value)
+
+    if n == 1:
+        return value[0]
+    return value
