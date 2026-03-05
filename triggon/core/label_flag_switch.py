@@ -4,14 +4,8 @@ from threading import Lock, Timer
 from typing import TYPE_CHECKING, Any, Mapping
 
 from .._internal import LOG_VERBOSITY, REVERT, TRIGGER
-from .._internal._types import (
-    Callsite,
-    DebugConfig,
-    DelayKey,
-    DelayState,
-    RevertMap,
-    TriggerMap,
-)
+from .._internal._types.aliases import DelayKey, RevertMap, TriggerMap
+from .._internal._types.structs import Callsite, DebugConfig, DelayState
 from .._internal.frames import get_callsite, get_target_frame
 from .value_resolver import evaluate_cond
 
