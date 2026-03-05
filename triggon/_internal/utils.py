@@ -1,6 +1,6 @@
 from typing import Any, KeysView, Sequence
 
-from ._types import RevertMap, TriggerMap
+from ._types.aliases import RevertMap, TriggerMap
 
 
 def to_dict(
