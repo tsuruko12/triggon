@@ -165,7 +165,7 @@ class LabelFlagController:
         self,
         label_to_idx: TriggerMap | RevertMap,
         data: _ToggleData,
-        label_to_timer_id: Mapping[str, int] | None = None,  # only for deley
+        label_to_timer_id: Mapping[str, int] | None = None,
     ) -> None:
         # used only for delayed execution
         labels = tuple(label_to_idx)
