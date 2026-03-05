@@ -1,18 +1,44 @@
-from typing import Mapping
+import threading
+from typing import TYPE_CHECKING, Any
 
-from ..._internal import (
-    LOG_VERBOSITY,
-    VAR,
-    get_callsite,
-    get_target_frame,
+from ..._internal import LOG_VERBOSITY, VAR
+from ..._internal._types.aliases import LabelToRefs
+from ..._internal._types.structs import (
+    AttrRef,
+    Callsite,
+    DebugConfig,
+    RefMeta,
+    RefsByKind,
+    VarRef,
 )
+from ..._internal.frames import get_callsite, get_target_frame
 from ..value_resolver import resolve_ref_info
-from ..._internal.arg_types import AttrRef, LabelToRefs, RefMeta, VarRef
+from .lookup import RefLookup
 
 
-class RefRegistrar:
-    def register_ref_map(self, label_to_refs: LabelToRefs, f_globals: Mapping) -> None:
-        frame = get_target_frame(depth=1)
+class RefRegistrar(RefLookup):
+    debug: DebugConfig
+    _label_is_active: dict[str, bool]
+    _label_refs: dict[str, RefsByKind]
+    _id_meta: dict[int, RefMeta]
+    _lock: threading.Lock
+
+    if TYPE_CHECKING:
+
+        def log_registered_name(self, target_name: str, callsite: Callsite) -> None: ...
+
+        def update_values(
+            self,
+            label: str,
+            idx: int | None,
+            f_globals: dict[str, Any],
+            callsite: Callsite,
+            set_true: bool,
+        ) -> None: ...
+
+    def register_ref_map(self, label_to_refs: LabelToRefs) -> None:
+        frame = get_target_frame(depth=2)
+        f_globals = frame.f_globals
         callsite = get_callsite(frame)
 
         target_ids = self.get_ids_by_file(callsite.file)
@@ -37,6 +63,7 @@ class RefRegistrar:
                     if ref[0] == VAR:
                         kind, value = ref
                         save_ref = VarRef(ref_id=self._latest_id, var_name=name)
+                        self._label_refs[label][kind].append(save_ref)
                     else:
                         # 'attr'
                         kind, value, attr_name, parent_obj = ref
@@ -46,8 +73,8 @@ class RefRegistrar:
                             parent_obj=parent_obj,
                             full_name=name,
                         )
+                        self._label_refs[label][kind].append(save_ref)
 
-                    self._label_refs[label][kind].append(save_ref)
                     self._id_meta[self._latest_id] = RefMeta(
                         file=callsite.file,
                         func_name=callsite.func_name,
