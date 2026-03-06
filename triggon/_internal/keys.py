@@ -1,5 +1,6 @@
 ATTR = "attr"
-VAR = "var"
+GLOB_VAR = "glob_var"
+LOC_VAR = "local_var"
 
 TRIGGER = "trigger"
 REVERT = "revert"
