@@ -1,5 +1,4 @@
 # triggon
-
 [![PyPI](https://img.shields.io/pypi/v/triggon)](https://pypi.org/project/triggon/)
 ![Python](https://img.shields.io/pypi/pyversions/triggon)
 ![Python](https://img.shields.io/pypi/l/triggon)
@@ -28,9 +27,13 @@ This library dynamically switches values and functions at labeled trigger points
 - Delay execution of almost any library and custom function
 
 ## Upcoming Features
-- Add environment-variable-only debug configuration, including verbosity, file output, and target labels
 - Split label and value registration into two class methods: one for a single label and one for multiple labels
+- Add environment-variable-only debug configuration, including verbosity, file output, and target labels
 - Support more flexible ways of passing functions and class methods to the deferred-execution class
+- Add a `reschedule` option to overwrite an already scheduled delayed trigger
+- Add a `match_all` option to `is_triggered` and `is_registered`
+- Add support for updating local variable values on CPython 3.13+
+- Add a context manager for temporary changes and rollback
 
 ## Installation
 ```bash
