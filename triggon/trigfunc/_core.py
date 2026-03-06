@@ -1,21 +1,27 @@
+from __future__ import annotations
+
 import builtins
 from dataclasses import dataclass
 from types import FrameType
-from typing import Any, Literal, Self
+from typing import Any, Callable, Literal, Mapping, cast
 
-from ..errors.public import FrameAccessError
 from .._internal import _NO_VALUE
 from .._internal.frames import get_target_frame
-
+from ..errors.public import FrameAccessError
 
 type AttrArg = tuple[Literal["attr"], str]
 type CallArg = tuple[Literal["call"], tuple[Any, ...], dict[str, Any]]
 
 
-# Internal mixin for TrigFunc
 class _Core:
+    """Internal mixin for TrigFunc"""
+
+    _trigcall: _TrigCall | None
+    _f_locals: Mapping[str, Any]
+    _f_globals: Mapping[str, Any]
+
     def get_user_frame(self) -> FrameType:
-        frame = get_target_frame(depth=1)
+        frame = get_target_frame(depth=2)
         user_frame = frame.f_back
         if user_frame is None:
             raise FrameAccessError()
@@ -77,7 +83,7 @@ class _Core:
             else:
                 # 'call'
                 args, kwargs = v[1], v[2]
-                obj = obj(*args, **kwargs)
+                obj = cast(Callable[..., Any], obj)(*args, **kwargs)
 
         return obj
 
@@ -85,11 +91,12 @@ class _Core:
 @dataclass(frozen=True, slots=True)
 class _TrigCall:
     target: tuple[AttrArg | CallArg, ...]
-    name: str  # Only for debug
+    name: str  # only for debug
 
-    def add_attr(self, name: str) -> Self:
+    def add_attr(self, name: str) -> _TrigCall:
+        attr_arg: AttrArg = ("attr", name)
         return _TrigCall(
-            self.target + (("attr", name),),
+            self.target + (attr_arg,),
             f"{self.name}.{name}",
         )
 
@@ -97,8 +104,9 @@ class _TrigCall:
         self,
         args: tuple[Any, ...],
         kwargs: dict[str, Any],
-    ) -> Self:
+    ) -> _TrigCall:
+        call_arg: CallArg = ("call", args, dict(kwargs))
         return _TrigCall(
-            self.target + (("call", args, dict(kwargs)),),
+            self.target + (call_arg,),
             self.name + "()",
         )
