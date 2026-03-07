@@ -1,7 +1,8 @@
 import logging
 import os
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 
 from ..errors.public import UnregisteredLabelError
 from ._types.aliases import DebugArg
