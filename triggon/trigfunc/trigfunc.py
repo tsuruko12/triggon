@@ -1,7 +1,7 @@
-from typing import Any, Mapping, Self
+from collections.abc import Mapping
+from typing import Any, Self
 
-from ._core import _TrigCall, _Core
-
+from ._core import _Core, _TrigCall
 
 TRIGFUNC_ATTR = "__trigfunc__"
 
