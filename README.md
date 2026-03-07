@@ -32,7 +32,6 @@ This library dynamically switches values and functions at labeled trigger points
 - Support more flexible ways of passing functions and class methods to the deferred-execution class
 - Add a `reschedule` option to overwrite an already scheduled delayed trigger
 - Add a `match_all` option to `is_triggered` and `is_registered`
-- Add support for updating local variable values on CPython 3.13+
 - Add a context manager for temporary changes and rollback
 
 ## Installation
