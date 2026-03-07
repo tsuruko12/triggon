@@ -1,4 +1,7 @@
-from ..._internal import VAR
+from typing import cast
+
+from ..._internal import ATTR, VAR
+from ..._internal._types.aliases import UpdateRefs
 from ..._internal._types.structs import AttrRef, RefMeta, RefsByKind, VarRef
 
 
@@ -25,10 +28,11 @@ class RefLookup:
         for value in target_values:
             for kind, refs in value.items():
                 if kind == VAR:
-                    matched_var_refs.extend(refs)
+                    matched_var_refs.extend(cast(VarRef, refs))
+                elif kind == ATTR:
+                    matched_attr_refs.extend(cast(AttrRef, refs))
                 else:
-                    # 'attr'
-                    matched_attr_refs.extend(refs)
+                    raise AssertionError(f"unreachable kind key: {kind!r}")
 
         return tuple(matched_var_refs), tuple(matched_attr_refs)
 
@@ -44,6 +48,8 @@ class RefLookup:
             if ref.var_name != target_name:
                 continue
             if ref.ref_id in target_ids:
+                continue
+            if self._id_meta[ref.ref_id].func_name == func_name:
                 return True
 
         for ref in target_attr_refs:
@@ -51,8 +57,24 @@ class RefLookup:
                 continue
             if ref.ref_id not in target_ids:
                 continue
-            # attr names can collide; check func_name too
             if self._id_meta[ref.ref_id].func_name == func_name:
                 return True
 
         return False
+
+    def find_update_refs(self, label: str, file: str) -> UpdateRefs:
+        label_refs = self._label_refs[label]
+
+        update_refs = []
+
+        for ref in label_refs[VAR]:
+            if self._id_meta[ref.ref_id].file != file:
+                continue
+            update_refs.append(ref)
+
+        for ref in label_refs[ATTR]:
+            if self._id_meta[ref.ref_id].file != file:
+                continue
+            update_refs.append(ref)
+
+        return update_refs
