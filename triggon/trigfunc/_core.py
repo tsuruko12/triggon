@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import builtins
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from types import FrameType
-from typing import Any, Callable, Literal, Mapping, cast
+from typing import Any, Literal, cast
 
+from ..errors.public import FrameAccessError
 from .._internal import _NO_VALUE
 from .._internal.frames import get_target_frame
-from ..errors.public import FrameAccessError
+from .._internal._types.aliases import AttrKey
 
-type AttrArg = tuple[Literal["attr"], str]
+type AttrArg = tuple[AttrKey, str]
 type CallArg = tuple[Literal["call"], tuple[Any, ...], dict[str, Any]]
 
 
