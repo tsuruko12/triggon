@@ -1,19 +1,10 @@
+from collections.abc import MutableMapping
 from dataclasses import dataclass
 from threading import Timer
 from typing import Any, NamedTuple, TypedDict
 
-from .aliases import LogFile, TargetLabels, Verbosity
-
-# Data Classes
-
-
-@dataclass(slots=True)
-class DelayState:
-    is_delay: bool = False
-    timer: Timer | None = None
-    cur_timer_id: int = 0
-    labels: tuple[str, ...] | None = None
-
+from ..keys import GLOB_VAR
+from .aliases import LogFile, TargetLabels, VarKey, Verbosity
 
 # NamedTuples
 
@@ -54,5 +45,31 @@ class DebugConfig(TypedDict):
 
 
 class RefsByKind(TypedDict):
-    var: list[VarRef]
+    loc_var: list[VarRef]
+    glob_var: list[VarRef]
     attr: list[AttrRef]
+
+
+# Data Classes
+
+
+@dataclass(slots=True)
+class DelayState:
+    is_delay: bool = False
+    timer: Timer | None = None
+    cur_timer_id: int = 0
+    labels: tuple[str, ...] | None = None
+
+
+@dataclass(slots=True)
+class FrameContext:
+    f_globals: MutableMapping[str, Any]
+    f_locals: MutableMapping[str, Any]
+    callsite: Callsite
+
+    def get_var_scope(self, kind: VarKey) -> MutableMapping[str, Any]:
+        if kind == GLOB_VAR:
+            return self.f_globals
+        else:
+            # 'loc_var'
+            return self.f_locals
