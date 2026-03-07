@@ -1,41 +1,18 @@
-from typing import TYPE_CHECKING, Any, Literal, Mapping, NamedTuple
+from collections.abc import Mapping, MutableMapping
+from typing import TYPE_CHECKING, Any
 
-from .._internal import (
-    ATTR,
-    GLOB_VAR,
-    LOC_VAR,
-    LOG_VERBOSITY,
-    UPDATE_LOCK,
-)
+from .._internal import LOG_VERBOSITY, UPDATE_LOCK
+from .._internal._types.aliases import UpdateRefs
 from .._internal._types.structs import (
     AttrRef,
     Callsite,
     DebugConfig,
-    FrameContext,
     RefMeta,
     RefsByKind,
     VarRef,
 )
 from ..errors.public import UpdateError
 from ..trigfunc import TRIGFUNC_ATTR
-
-
-class _GlobVarRef(NamedTuple):
-    kind: Literal["glob_var"]
-    ref: VarRef
-
-
-class _LocVarRef(NamedTuple):
-    kind: Literal["loc_var"]
-    ref: VarRef
-
-
-class _AttrRef(NamedTuple):
-    kind: Literal["attr"]
-    ref: AttrRef
-
-
-type UpdateRef = _GlobVarRef | _LocVarRef | _AttrRef
 
 
 class ValueUpdater:
@@ -56,84 +33,73 @@ class ValueUpdater:
             target_name: str | None = None,
         ) -> None: ...
 
+        def find_update_refs(self, label: str, file: str) -> UpdateRefs: ...
+
     def update_values(
         self,
         label: str,
         idx: int | None,
-        frame_ctx: FrameContext,
+        f_globals: MutableMapping[str, Any],
+        callsite: Callsite,
         set_true: bool,
+        update_refs: UpdateRefs | None = None,
     ) -> None:
         debug_on = self.debug[LOG_VERBOSITY] > 1
         label_value = self._new_values[label]
 
-        callsite = frame_ctx.callsite
-        update_refs = self._find_update_refs(label, callsite.file)
+        if update_refs is None:
+            update_refs = self.find_update_refs(label, callsite.file)
 
-        for ref_cls in update_refs:
+        for ref in update_refs:
             new_value, label_idx = self._get_new_value_and_idx(
                 set_true,
                 label_value,
                 idx,
-                ref_cls.ref.ref_id,
+                ref.ref_id,
             )
-            
+
             # use a global lock for value assignment
             with UPDATE_LOCK:
-                # update attribute 
-                if ref_cls.kind == ATTR:
-                    attr_ref: AttrRef = ref_cls.ref
-                    
+                if isinstance(ref, AttrRef):
+                    # update attributes
                     try:
-                        prev_value = getattr(attr_ref.parent_obj, attr_ref.attr_name)
+                        prev_value = getattr(ref.parent_obj, ref.attr_name)
                         if prev_value == new_value:
                             continue
                         if set_true and hasattr(new_value, TRIGFUNC_ATTR):
-                            setattr(attr_ref.parent_obj, attr_ref.attr_name, new_value.run())
+                            setattr(ref.parent_obj, ref.attr_name, new_value.run())
                         else:
-                            setattr(attr_ref.parent_obj, attr_ref.attr_name, new_value)
+                            setattr(ref.parent_obj, ref.attr_name, new_value)
                     except (AttributeError, TypeError, ValueError) as e:
-                        raise UpdateError(attr_ref.full_name, e) from None
+                        raise UpdateError(ref.full_name, e) from None
                     else:
-                        if debug_on:
-                            self.log_value_update(
-                                label,
-                                label_idx,
-                                prev_value,
-                                new_value,
-                                callsite,
-                                target_name=attr_ref.full_name,
-                            )  
-                        continue
-
-                # update local/global variable
-
-                if ref_cls.kind == LOC_VAR:
-                    scope = frame_ctx.f_locals
-                else:
-                    scope = frame_ctx.f_globals
-                
-                var_ref: VarRef = ref_cls.ref
-
-                try: 
-                    prev_value = scope[var_ref.var_name]
-                    if prev_value == new_value:
-                        continue
-                    if set_true and hasattr(new_value, TRIGFUNC_ATTR):
-                        scope[var_ref.var_name] = new_value.run()
+                        target_name = ref.full_name
+                elif isinstance(ref, VarRef):
+                    # update local/global variables
+                    try:
+                        prev_value = f_globals[ref.var_name]
+                        if prev_value == new_value:
+                            continue
+                        if set_true and hasattr(new_value, TRIGFUNC_ATTR):
+                            f_globals[ref.var_name] = new_value.run()
+                        else:
+                            f_globals[ref.var_name] = new_value
+                    except KeyError as e:
+                        raise UpdateError(ref.var_name, e) from None
                     else:
-                        scope[var_ref.var_name] = new_value
-                except KeyError as e:
-                    raise UpdateError(var_ref.var_name, e) from None
+                        target_name = ref.var_name
                 else:
-                    if debug_on:
-                        self.log_value_update(
-                            label,
-                            label_idx,
-                            prev_value,
-                            new_value,
-                            callsite,
-                            target_name=var_ref.var_name,
-                        )
+                    raise AssertionError(f"unreachable ref class: {ref!r}")
+
+                if debug_on:
+                    self.log_value_update(
+                        label,
+                        label_idx,
+                        prev_value,
+                        new_value,
+                        callsite,
+                        target_name,
+                    )
 
     def _get_new_value_and_idx(
         self,
@@ -150,24 +116,3 @@ class ValueUpdater:
             new_value = label_value[idx]
 
         return new_value, idx
-
-    def _find_update_refs(self, label: str, file: str) -> list[UpdateRef]:
-        update_refs = []
-        label_refs = self._label_refs[label]
-
-        for ref in label_refs[LOC_VAR]:
-            if self._id_meta[ref.ref_id].file != file:
-                continue    
-            update_refs.append(_LocVarRef(kind=LOC_VAR, ref=ref))
-
-        for ref in label_refs[GLOB_VAR]:
-            if self._id_meta[ref.ref_id].file != file:
-                continue    
-            update_refs.append(_GlobVarRef(kind=GLOB_VAR, ref=ref))
-
-        for ref in label_refs[ATTR]:
-            if self._id_meta[ref.ref_id].file != file:
-                continue    
-            update_refs.append(_AttrRef(kind=ATTR, ref=ref))
-
-        return update_refs
