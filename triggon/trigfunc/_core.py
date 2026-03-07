@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from types import FrameType
 from typing import Any, Literal, cast
 
-from ..errors.public import FrameAccessError
 from .._internal import _NO_VALUE
-from .._internal.frames import get_target_frame
 from .._internal._types.aliases import AttrKey
+from .._internal.frames import get_target_frame
+from ..errors.public import FrameAccessError
 
 type AttrArg = tuple[AttrKey, str]
 type CallArg = tuple[Literal["call"], tuple[Any, ...], dict[str, Any]]
