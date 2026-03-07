@@ -1,7 +1,8 @@
 import logging
+from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass
 from threading import Lock, Timer
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any
 
 from .._internal import LOG_VERBOSITY, REVERT, TRIGGER
 from .._internal._types.aliases import DelayKey, RevertMap, TriggerMap
@@ -11,10 +12,10 @@ from .value_resolver import evaluate_cond
 
 
 @dataclass(frozen=True, slots=True)
-class _ToggleData:
-    callsite: Callsite
-    f_globals: dict[str, Any]
+class _ToggleAction:
     delay_key: DelayKey
+    f_globals: MutableMapping[str, Any]
+    callsite: Callsite
     set_true: bool
     disable: bool
 
@@ -28,6 +29,7 @@ class LabelFlagController:
     _lock: Lock
 
     if TYPE_CHECKING:
+        from .._internal._types.aliases import UpdateRefs
 
         def log_label_flag_change(
             self,
@@ -42,9 +44,10 @@ class LabelFlagController:
             self,
             label: str,
             idx: int | None,
-            f_globals: dict[str, Any],
+            f_globals: MutableMapping[str, Any],
             callsite: Callsite,
             is_trigger: bool,
+            update_refs: UpdateRefs | None = None,
         ) -> None: ...
 
     def set_label_flags(
@@ -69,23 +72,29 @@ class LabelFlagController:
         f_globals = frame.f_globals
         frame = None
 
-        data = _ToggleData(callsite, f_globals, delay_key, set_true, disable)
+        toggle_act = _ToggleAction(delay_key, f_globals, callsite, set_true, disable)
 
         if after != 0 or reschedule:
             # remove labels that are already scheduled for a delay
-            label_to_timer_id = self._prepare_delay(label_to_idx, data, after, reschedule)
+            label_to_timer_id = self._prepare_delay(
+                label_to_idx,
+                toggle_act,
+                after,
+                reschedule,
+                callsite,
+            )
             if not label_to_timer_id:
                 return
         else:
             label_to_timer_id = None
 
         if after == 0:
-            self._set_flags_and_update(label_to_idx, data, label_to_timer_id=label_to_timer_id)
+            self._set_flags_and_update(label_to_idx, toggle_act, label_to_timer_id)
         else:
             timer = Timer(
                 after,
                 self._set_flags_and_update,
-                args=(label_to_idx, data),
+                args=(label_to_idx, toggle_act),
                 kwargs={"label_to_timer_id": label_to_timer_id},
             )
             target_labels = tuple(label_to_idx.keys())
@@ -100,9 +109,10 @@ class LabelFlagController:
     def _prepare_delay(
         self,
         label_to_idx: TriggerMap | RevertMap,
-        data: _ToggleData,
+        toggle_act: _ToggleAction,
         after: int | float,
         reschedule: bool,
+        callsite: Callsite,
     ) -> Mapping[str, int]:
         labels = tuple(label_to_idx)
 
@@ -117,14 +127,8 @@ class LabelFlagController:
                 if self._label_is_perm_disabled[label]:
                     del label_to_idx[label]
                     continue
-                elif data.set_true and self._label_is_active[label]:
-                    del label_to_idx[label]
-                    continue
-                elif not data.set_true and not self._label_is_active[label]:
-                    del label_to_idx[label]
-                    continue
 
-                delay_state = self._label_delay_state[label][data.delay_key]
+                delay_state = self._label_delay_state[label][toggle_act.delay_key]
 
                 if not reschedule and delay_state.is_delay:
                     # already deferred labels are excluded
@@ -140,13 +144,18 @@ class LabelFlagController:
                 stale_timer = delay_state.timer
                 stale_timer_labels = delay_state.labels
 
+            if toggle_act.set_true and self._label_is_active[label]:
+                continue
+            elif not toggle_act.set_true and not self._label_is_active[label]:
+                continue
+
             if debug_on:
                 self.log_label_flag_change(
                     label,
-                    data.callsite,
-                    data.set_true,
+                    callsite,
+                    toggle_act.set_true,
                     after,
-                    data.disable,
+                    toggle_act.disable,
                 )
 
         if stale_timer is not None and stale_timer_labels is not None:
@@ -158,7 +167,7 @@ class LabelFlagController:
     def _set_flags_and_update(
         self,
         label_to_idx: TriggerMap | RevertMap,
-        data: _ToggleData,
+        toggle_act: _ToggleAction,
         label_to_timer_id: Mapping[str, int] | None = None,
     ) -> None:
         # used only for delayed execution
@@ -169,7 +178,7 @@ class LabelFlagController:
         try:
             for label, i in label_to_idx.items():
                 with self._lock:
-                    delay_state = self._label_delay_state[label][data.delay_key]
+                    delay_state = self._label_delay_state[label][toggle_act.delay_key]
 
                     if self._label_is_perm_disabled[label]:
                         continue
@@ -182,25 +191,33 @@ class LabelFlagController:
                         else:
                             continue
 
-                    is_triggered = self._label_is_active[label]
-                    if data.set_true and not is_triggered:
+                    triggered = self._label_is_active[label]
+                    if toggle_act.set_true and not triggered:
                         self._label_is_active[label] = True
-                    elif not data.set_true and is_triggered:
+                        toggled = True
+                    elif not toggle_act.set_true and triggered:
                         self._label_is_active[label] = False
-                        if data.disable:
+                        if toggle_act.disable:
                             self._label_is_perm_disabled[label] = True
+                        toggled = True
                     else:
-                        continue
+                        toggled = False
 
                 if debug_on:
                     self.log_label_flag_change(
                         label,
-                        data.callsite,
-                        data.set_true,
-                        disable=data.disable,
+                        toggle_act.callsite,
+                        toggle_act.set_true,
+                        disable=toggle_act.disable,
                     )
 
-                self.update_values(label, i, data.f_globals, data.callsite, data.set_true)
+                self.update_values(
+                    label,
+                    i,
+                    toggle_act.f_globals,
+                    toggle_act.callsite,
+                    toggle_act.set_true,
+                )
         except Exception as e:
             if delay_state.is_delay:
                 if self._logger is not None:
@@ -211,7 +228,7 @@ class LabelFlagController:
             self._clear_delay_state(
                 label_to_timer_id,
                 target_labels=labels,
-                delay_key=data.delay_key,
+                delay_key=toggle_act.delay_key,
             )
 
     def _clear_delay_state(
