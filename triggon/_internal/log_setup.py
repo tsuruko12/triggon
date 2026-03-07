@@ -5,17 +5,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ..errors.public import UnregisteredLabelError
-from ._types.aliases import DebugArg
-from ._types.structs import (
-    DebugConfig,
-    LogFile,
-    TargetLabels,
-    Verbosity,
-)
+from ._types.aliases import DebugArg, LogFile, TargetLabels
+from ._types.structs import DebugConfig
 from .keys import LOG_FILE, LOG_LABELS, LOG_VERBOSITY
 from .lock import UPDATE_LOCK
 
-type LogConfigTuple = tuple[Verbosity, LogFile, TargetLabels]
+type LogConfigTuple = tuple[int, LogFile, TargetLabels]
 
 DEBUG_LOG_FMT = (
     "%(asctime)s %(levelname)s %(caller_func)s %(caller_file)s:%(caller_line)d - %(message)s"
