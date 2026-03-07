@@ -1,4 +1,5 @@
-from typing import Any, KeysView, Mapping, Sequence, ValuesView
+from collections.abc import KeysView, Mapping, Sequence, ValuesView
+from typing import Any
 
 from ..errors.public import InvalidArgumentError, UnregisteredLabelError
 from ._types.aliases import IndexArg, LabelArg
