@@ -1,8 +1,8 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from threading import Timer
 from typing import Any, NamedTuple, TypedDict
-
-from .aliases import LogFile, TargetLabels, Verbosity
 
 # NamedTuples
 
@@ -37,9 +37,9 @@ class Callsite(NamedTuple):
 
 
 class DebugConfig(TypedDict):
-    TRIGGON_LOG_VERBOSITY: Verbosity
-    TRIGGON_LOG_FILE: LogFile
-    TRIGGON_LOG_LABELS: TargetLabels
+    TRIGGON_LOG_VERBOSITY: int
+    TRIGGON_LOG_FILE: Path | None
+    TRIGGON_LOG_LABELS: Sequence[str] | None
 
 
 class RefsByKind(TypedDict):

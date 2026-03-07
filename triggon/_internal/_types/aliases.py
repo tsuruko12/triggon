@@ -7,14 +7,13 @@ from .structs import AttrRef, VarRef
 # Literal
 type DelayKey = Literal["trigger", "revert"]
 type NumArg = Literal["after", "index", "indices"]
-type VarKey = Literal["glob_var", "loc_var"]
+type VarKey = Literal["var"]
 type AttrKey = Literal["attr"]
 
 # References
-type UpdateRefs = list[tuple[VarKey, VarRef] | tuple[AttrKey, AttrRef]]
+type UpdateRefs = list[VarRef | AttrRef]
 
 # Logging
-type Verbosity = int
 type LogFile = Path | None
 type TargetLabels = Sequence[str] | None
 
