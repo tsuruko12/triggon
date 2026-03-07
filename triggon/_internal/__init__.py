@@ -1,4 +1,4 @@
-from .keys import ATTR, GLOB_VAR, LOC_VAR, LOG_VERBOSITY, REVERT, TRIGGER
+from .keys import ATTR, LOG_VERBOSITY, REVERT, TRIGGER, VAR
 from .lock import UPDATE_LOCK
 from .log_setup import logger
 from .mixins import _Internal
@@ -16,12 +16,11 @@ from .validators import (
 
 all = [
     "ATTR",
-    "GLOB_VAR",
-    "LOC_VAR",
     "LOG_VERBOSITY",
     "TRIGGER",
     "REVERT",
     "UPDATE_LOCK",
+    "VAR",
     "_Internal",
     "_NO_VALUE",
     "check_after",
