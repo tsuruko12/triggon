@@ -10,7 +10,7 @@ This library dynamically switches values and functions at labeled trigger points
 
 > **Warning**:  
 > The next update will include breaking changes.  
-> Some API behavior and argument names will change.
+> Some API behavior, argument names, and the name of the `switch_var` API will change.
 
 ## Table of Contents
 - [Installation](#installation)
