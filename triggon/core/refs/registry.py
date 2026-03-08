@@ -1,11 +1,11 @@
 import threading
+from collections.abc import MutableMapping
 from typing import TYPE_CHECKING, Any
 
-from ..._internal import LOG_VERBOSITY, VAR
+from ..._internal import ATTR, LOG_VERBOSITY, VAR
 from ..._internal._types.aliases import LabelToRefs
 from ..._internal._types.structs import (
     AttrRef,
-    Callsite,
     DebugConfig,
     RefMeta,
     RefsByKind,
@@ -24,6 +24,8 @@ class RefRegistrar(RefLookup):
     _lock: threading.Lock
 
     if TYPE_CHECKING:
+        from ..._internal._types.aliases import UpdateRefs
+        from ..._internal._types.structs import Callsite
 
         def log_registered_name(self, target_name: str, callsite: Callsite) -> None: ...
 
@@ -31,9 +33,10 @@ class RefRegistrar(RefLookup):
             self,
             label: str,
             idx: int | None,
-            f_globals: dict[str, Any],
+            f_globals: MutableMapping[str, Any],
             callsite: Callsite,
             set_true: bool,
+            update_refs: UpdateRefs | None = None,
         ) -> None: ...
 
     def register_ref_map(self, label_to_refs: LabelToRefs) -> None:
@@ -64,8 +67,7 @@ class RefRegistrar(RefLookup):
                         kind, value = ref
                         save_ref = VarRef(ref_id=self._latest_id, var_name=name)
                         self._label_refs[label][kind].append(save_ref)
-                    else:
-                        # 'attr'
+                    elif ref[0] == ATTR:
                         kind, value, attr_name, parent_obj = ref
                         save_ref = AttrRef(
                             ref_id=self._latest_id,
@@ -74,6 +76,8 @@ class RefRegistrar(RefLookup):
                             full_name=name,
                         )
                         self._label_refs[label][kind].append(save_ref)
+                    else:
+                        raise AssertionError(f"unreachable ref kind: {kind!r}")
 
                     self._id_meta[self._latest_id] = RefMeta(
                         file=callsite.file,
@@ -84,6 +88,14 @@ class RefRegistrar(RefLookup):
                     self._latest_id += 1
 
                 if self.debug[LOG_VERBOSITY] == 3:
-                    self.log_registered_name(value, callsite)
+                    self.log_registered_name(name, callsite)
+
                 if self._label_is_active[label]:
-                    self.update_values(label, idx, f_globals, callsite, set_true=True)
+                    self.update_values(
+                        label,
+                        idx,
+                        f_globals,
+                        callsite,
+                        set_true=True,
+                        update_refs=[save_ref],
+                    )
