@@ -2,6 +2,7 @@ from collections.abc import Mapping
 from typing import Any, Self
 
 from ._core import _Core, _TrigCall
+from .._internal.frames import get_target_frame
 
 TRIGFUNC_ATTR = "__trigfunc__"
 
@@ -37,7 +38,7 @@ class TrigFunc(_Core):
     def __init__(self) -> None:
         self._trigcall = None
 
-        frame = self.get_user_frame()
+        frame = get_target_frame()
         self._f_locals = frame.f_locals
         self._f_globals = frame.f_globals
         frame = None
