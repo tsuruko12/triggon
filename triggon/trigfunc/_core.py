@@ -6,10 +6,9 @@ from dataclasses import dataclass
 from types import FrameType
 from typing import Any, Literal, cast
 
-from .._internal import _NO_VALUE
 from .._internal._types.aliases import AttrKey
 from .._internal.frames import get_target_frame
-from ..errors.public import FrameAccessError
+from .._internal.sentinel import _NO_VALUE
 
 type AttrArg = tuple[AttrKey, str]
 type CallArg = tuple[Literal["call"], tuple[Any, ...], dict[str, Any]]
@@ -21,14 +20,6 @@ class _Core:
     _trigcall: _TrigCall | None
     _f_locals: Mapping[str, Any]
     _f_globals: Mapping[str, Any]
-
-    def get_user_frame(self) -> FrameType:
-        frame = get_target_frame(depth=2)
-        user_frame = frame.f_back
-        if user_frame is None:
-            raise FrameAccessError()
-
-        return user_frame
 
     def resolve_value(
         self,
@@ -75,7 +66,7 @@ class _Core:
                 except NameError:
                     # Retry using the current user frame
                     try:
-                        frame = self.get_user_frame()
+                        frame = get_target_frame()
                         if obj is _NO_VALUE:
                             obj = self.resolve_value(name, frame=frame)
                         else:
@@ -108,7 +99,12 @@ class _TrigCall:
         kwargs: dict[str, Any],
     ) -> _TrigCall:
         call_arg: CallArg = ("call", args, dict(kwargs))
+
+        arg_parts = [repr(arg) for arg in args]
+        kwarg_parts = [f"{k}={v!r}" for k, v in kwargs.items()]
+        joined = ", ".join(arg_parts + kwarg_parts)
+
         return _TrigCall(
             self.target + (call_arg,),
-            self.name + "()",
+            f"{self.name}({joined})",
         )
