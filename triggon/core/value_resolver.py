@@ -1,14 +1,15 @@
 import ast
 import inspect
 from types import FrameType
-from typing import Any, Literal
+from typing import Any
 
-from ..errors import InvalidArgumentError
-from .._internal import ATTR, VAR, _NO_VALUE
+from ..errors.public import InvalidArgumentError
+from .._internal import _NO_VALUE, ATTR, VAR
+from .._internal._types.aliases import AttrKey, VarKey
 
 
-type VarResult = tuple[Literal["var"], Any] # ('var', value)
-type AttrResult = tuple[Literal["attr"], Any, str, Any]  # ('attr', value, attr name, parent_obj)
+type VarResult = tuple[VarKey, Any]  # ('var', value)
+type AttrResult = tuple[AttrKey, Any, str, Any]  # ('attr', value, attr name, parent_obj)
 
 
 ALLOWED_FUNCS = {
@@ -105,8 +106,7 @@ def evaluate_cond(frame: FrameType, expr: str) -> bool:
                 var_scope[v.id] = value
             else:
                 raise InvalidArgumentError(
-                    "cond: invalid attribute access "
-                    "(allowed: x.y.z; not allowed: foo().x, (a+b).x)"
+                    "cond: invalid attribute access (allowed: x.y.z; not allowed: foo().x, (a+b).x)"
                 )
         elif isinstance(node, ast.Call):
             _ensure_allowed_call(node)
@@ -162,8 +162,10 @@ def resolve_ref_info(target_name: str, frame: FrameType) -> VarResult | AttrResu
         has_attr_chain = False
 
     value = frame.f_locals.get(target_name, _NO_VALUE)
-    if not has_attr_chain and value is not _NO_VALUE:
-        raise InvalidArgumentError(f"cannot assign to local variable {target_name!r}")
+
+    if value is not _NO_VALUE and not has_attr_chain:
+        if frame.f_globals is not frame.f_locals:
+            raise InvalidArgumentError(f"local variables cannot be registered: {target_name!r}")
     if value is _NO_VALUE:
         value = frame.f_globals.get(target_name, _NO_VALUE)
         if value is _NO_VALUE:
