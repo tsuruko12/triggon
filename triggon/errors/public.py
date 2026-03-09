@@ -4,6 +4,7 @@ class InvalidArgumentError(ValueError):
 
 class UnregisteredLabelError(KeyError):
     """Raised when a label is not registered."""
+
     def __init__(self, label: str, orig_label: str | None = None):
         super().__init__(label)
         self.label = label
@@ -18,6 +19,7 @@ class UnregisteredLabelError(KeyError):
 
 class UpdateError(Exception):
     """Raised when a registered variable or attribute cannot be updated."""
+
     def __init__(self, name: str, err: Exception):
         super().__init__(name, err)
         self.name = name
@@ -29,5 +31,13 @@ class UpdateError(Exception):
 
 class FrameAccessError(Exception):
     """Raised when the current execution frame cannot be accessed."""
+
     def __init__(self) -> None:
         super().__init__("failed to access the current execution frame")
+
+
+class RollbackNotSupportedError(RuntimeError):
+    """Raised when Triggon.rollback() is used on an unsupported Python runtime."""
+
+    def __init__(self) -> None:
+        super().__init__("Triggon.rollback() requires CPython 3.13 or later")
