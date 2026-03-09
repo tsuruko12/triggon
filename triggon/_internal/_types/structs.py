@@ -43,7 +43,7 @@ class DebugConfig(TypedDict):
 
 
 class RefsByKind(TypedDict):
-    var: list[VarRef]
+    glob_var: list[VarRef]
     attr: list[AttrRef]
 
 
