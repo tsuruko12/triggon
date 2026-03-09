@@ -1,5 +1,6 @@
 from .log_setup import logger
 from .mixins import _Internal
+from .rollback_ast import collect_rollback_refs, revert_targets
 from .utils import to_dict, unwrap_value
 from .validators import (
     check_after,
@@ -21,7 +22,9 @@ all = [
     "check_items",
     "check_labels",
     "check_str_sequence",
+    "collect_rollback_refs",
     "logger",
+    "revert_targets",
     "to_dict",
     "unwrap_value",
 ]
