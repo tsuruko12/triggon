@@ -5,12 +5,12 @@ class InvalidArgumentError(ValueError):
 class UnregisteredLabelError(KeyError):
     """Raised when a label is not registered."""
 
-    def __init__(self, label: str, orig_label: str | None = None):
+    def __init__(self, label: str, orig_label: str | None = None) -> None:
         super().__init__(label)
         self.label = label
         self.orig_label = orig_label
 
-    def __str__(self):
+    def __str__(self) -> str:
         msg = f"label {self.label!r} is not registered"
         if self.orig_label is None or not self.orig_label.startswith("*"):
             return msg
@@ -20,12 +20,12 @@ class UnregisteredLabelError(KeyError):
 class UpdateError(Exception):
     """Raised when a registered variable or attribute cannot be updated."""
 
-    def __init__(self, name: str, err: Exception):
+    def __init__(self, name: str, err: Exception) -> None:
         super().__init__(name, err)
         self.name = name
         self.err = err
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"failed to update {self.name!r}: {self.err}"
 
 
@@ -41,3 +41,8 @@ class RollbackNotSupportedError(RuntimeError):
 
     def __init__(self) -> None:
         super().__init__("Triggon.rollback() requires CPython 3.13 or later")
+
+
+class InactiveCaptureError(Exception):
+    def __init__(self) -> None:
+        super().__init__("capture_return() is not active")
