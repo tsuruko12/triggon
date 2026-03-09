@@ -3,12 +3,12 @@ import inspect
 from types import FrameType
 from typing import Any
 
-from ..errors.public import InvalidArgumentError
-from .._internal import _NO_VALUE, ATTR, VAR
 from .._internal._types.aliases import AttrKey, VarKey
+from .._internal.keys import ATTR, GLOB_VAR, LOC_VAR
+from .._internal.sentinel import _NO_VALUE
+from ..errors.public import InvalidArgumentError
 
-
-type VarResult = tuple[VarKey, Any]  # ('var', value)
+type VarResult = tuple[VarKey, Any]  # ('glob_var' or 'loc_var', value)
 type AttrResult = tuple[AttrKey, Any, str, Any]  # ('attr', value, attr name, parent_obj)
 
 
@@ -151,7 +151,11 @@ def _ensure_allowed_call(node: ast.Call) -> None:
         raise InvalidArgumentError("cond: dynamic calls are not allowed")
 
 
-def resolve_ref_info(target_name: str, frame: FrameType) -> VarResult | AttrResult:
+def resolve_ref_info(
+    target_name: str,
+    frame: FrameType,
+    allow_loc_var: bool = False,
+) -> VarResult | AttrResult:
     if "." in target_name:
         has_attr_chain = True
 
@@ -164,8 +168,11 @@ def resolve_ref_info(target_name: str, frame: FrameType) -> VarResult | AttrResu
     value = frame.f_locals.get(target_name, _NO_VALUE)
 
     if value is not _NO_VALUE and not has_attr_chain:
-        if frame.f_globals is not frame.f_locals:
-            raise InvalidArgumentError(f"local variables cannot be registered: {target_name!r}")
+        if not allow_loc_var:
+            if frame.f_globals is not frame.f_locals:
+                raise InvalidArgumentError(f"local variables cannot be registered: {target_name!r}")
+        else:
+            return LOC_VAR, value
     if value is _NO_VALUE:
         value = frame.f_globals.get(target_name, _NO_VALUE)
         if value is _NO_VALUE:
@@ -173,7 +180,7 @@ def resolve_ref_info(target_name: str, frame: FrameType) -> VarResult | AttrResu
 
     if has_attr_chain:
         return _walk_attr_chain(full_name, split_names, value)
-    return VAR, value
+    return GLOB_VAR, value
 
 
 def _walk_attr_chain(
