@@ -1,4 +1,4 @@
-from .label_flag_switch import LabelFlagController
+from .flag_switch import LabelFlagController
 from .refs.registry import RefRegistrar
 from .value_update import ValueUpdater
 
