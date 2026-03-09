@@ -19,7 +19,6 @@ from ..trigfunc import TRIGFUNC_ATTR
 class ValueUpdater:
     debug: DebugConfig
     _new_values: Mapping[str, tuple[Any, ...]]
-    _label_refs: dict[str, RefsByKind]
     _id_meta: dict[int, RefMeta]
 
     if TYPE_CHECKING:
