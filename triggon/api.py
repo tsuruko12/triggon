@@ -2,6 +2,7 @@ import logging
 import sys
 import threading
 from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import (
     Any,
     Mapping,
@@ -47,8 +48,26 @@ from ._internal.keys import (
 )
 from ._internal.sentinel import _NO_VALUE
 from .core.mixins import _Core
-from .errors.public import InvalidArgumentError, RollbackNotSupportedError
+from .errors.public import InactiveCaptureError, InvalidArgumentError, RollbackNotSupportedError
 from .trigfunc import TRIGFUNC_ATTR
+
+
+class _EarlyReturn(Exception):
+    """Internal signal used to perform an early return inside capture_return()."""
+
+
+@dataclass(slots=True)
+class _EarlyReturnState:
+    """Internal state for capture_return()."""
+    active: bool = False
+    value: Any = None
+
+
+@dataclass(slots=True)
+class EarlyReturnResult:
+    """Result returned by capture_return()."""
+    triggered: bool = False
+    value: Any = None
 
 
 class Triggon(_Core, _Internal):
@@ -63,7 +82,7 @@ class Triggon(_Core, _Internal):
     _label_refs: dict[str, RefsByKind]
     _id_meta: dict[int, RefMeta]
     _latest_id: int
-    _return_value: tuple[bool, Any] | None
+    _capture_return_state: _EarlyReturnState
     _lock: threading.Lock
 
     def __init__(
@@ -133,7 +152,7 @@ class Triggon(_Core, _Internal):
         self._label_refs = {}
         self._id_meta = {}
         self._latest_id = 1
-        self._return_value = None
+        self._capture_return_state = _EarlyReturnState()
         self._lock = threading.Lock()
 
         self._normalize_label_values(labels, new_values)
@@ -660,3 +679,104 @@ class Triggon(_Core, _Internal):
             yield
         finally:
             revert_targets(frame, name_to_refs)
+
+    @contextmanager
+    def capture_return(self) -> Any:
+        """Capture an early return triggered by `trigger_return()`.
+
+        `trigger_return()` is active only inside this context. If it is
+        triggered, the yielded result object is updated with `triggered=True`
+        and the captured value. If the captured value is a deferred `TrigFunc`
+        instance, it is executed and its result is stored.
+
+        Yields:
+            EarlyReturnResult: The result object for the captured return.
+        """
+
+        self._capture_return_state.active = True
+        result = EarlyReturnResult()
+
+        try:
+            yield result
+        except _EarlyReturn:
+            result.triggered = True
+
+            value = self._capture_return_state.value
+            if value is not None and hasattr(value, TRIGFUNC_ATTR):
+                result.value = value.run()
+            else:
+                result.value = value
+        finally:
+            self._capture_return_state.active = False
+
+    def trigger_return(
+        self,
+        labels: LabelArg,
+        /,
+        *,
+        indices: IndexArg | None = None,
+        value: Any = None,
+    ) -> Any:
+        """Trigger an early return when one of the labels is active.
+
+        This method is available only inside `capture_return()`. If no given
+        label is active, nothing happens and `None` is returned.
+
+        Args:
+            labels (str | Sequence[str]):
+                Labels to check for the early return. Labels must not start
+                with `*`.
+            indices (int | Sequence[int] | None, optional):
+                Explicit indices for the given labels. When provided, the
+                number of indices must match the number of labels.
+            value (Any, optional):
+                The value to capture when an active label is found and
+                `indices` is not provided. If the captured value is a deferred
+                `TrigFunc` instance, it is executed by `capture_return()`.
+
+        Returns:
+            None: Returns `None` when no given label is active.
+
+        Raises:
+            InactiveCaptureError:
+                If `capture_return()` is not active.
+            InvalidArgumentError:
+                If `labels` or `indices` are invalid, or if any label starts
+                with `*`.
+            UnregisteredLabelError:
+                If any given label is not registered.
+        """
+
+        if not self._capture_return_state.active:
+            raise InactiveCaptureError()
+
+        check_str_sequence("labels", labels)
+        check_idxs(indices)
+
+        labels, idxs = self.resolve_labels_and_idxs(labels, indices, allow_symbol=False)
+
+        target_label = None
+        target_idx = None
+
+        for i, label in enumerate(labels):
+            if self._label_is_active[label]:
+                target_label = label
+                if indices is not None:
+                    target_idx = idxs[i]
+                break
+        if target_label is None:
+            return
+
+        if target_idx is None:
+            return_val = value
+        else:
+            return_val = self._new_values[target_label][target_idx]
+
+        self._capture_return_state.value = return_val
+
+        if self.debug[LOG_VERBOSITY] != 0:
+            frame = get_target_frame()
+            callsite = get_callsite(frame)
+            self.log_early_return(target_label, return_val, callsite)
+
+        raise _EarlyReturn
