@@ -1,6 +1,7 @@
 # Reference Keys
 ATTR = "attr"
-VAR = "var"
+GLOB_VAR = "glob_var"
+LOC_VAR = "loc_var"
 
 # Delay Keys
 TRIGGER = "trigger"
