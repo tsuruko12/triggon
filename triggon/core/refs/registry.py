@@ -2,7 +2,6 @@ import threading
 from collections.abc import MutableMapping
 from typing import TYPE_CHECKING, Any
 
-from ..._internal import ATTR, LOG_VERBOSITY, VAR
 from ..._internal._types.aliases import LabelToRefs
 from ..._internal._types.structs import (
     AttrRef,
@@ -12,6 +11,7 @@ from ..._internal._types.structs import (
     VarRef,
 )
 from ..._internal.frames import get_callsite, get_target_frame
+from ..._internal.keys import ATTR, GLOB_VAR, LOG_VERBOSITY
 from ..value_resolver import resolve_ref_info
 from .lookup import RefLookup
 
@@ -27,7 +27,12 @@ class RefRegistrar(RefLookup):
         from ..._internal._types.aliases import UpdateRefs
         from ..._internal._types.structs import Callsite
 
-        def log_registered_name(self, target_name: str, callsite: Callsite) -> None: ...
+        def log_registered_name(
+            self,
+            target_name: str,
+            label: str,
+            callsite: Callsite,
+        ) -> None: ...
 
         def update_values(
             self,
@@ -63,21 +68,21 @@ class RefRegistrar(RefLookup):
 
                     ref = resolve_ref_info(name, frame)
 
-                    if ref[0] == VAR:
-                        kind, value = ref
+                    if ref[0] == GLOB_VAR:
+                        _, value = ref
                         save_ref = VarRef(ref_id=self._latest_id, var_name=name)
-                        self._label_refs[label][kind].append(save_ref)
+                        self._label_refs[label][GLOB_VAR].append(save_ref)
                     elif ref[0] == ATTR:
-                        kind, value, attr_name, parent_obj = ref
+                        _, value, attr_name, parent_obj = ref
                         save_ref = AttrRef(
                             ref_id=self._latest_id,
                             attr_name=attr_name,
                             parent_obj=parent_obj,
                             full_name=name,
                         )
-                        self._label_refs[label][kind].append(save_ref)
+                        self._label_refs[label][ATTR].append(save_ref)
                     else:
-                        raise AssertionError(f"unreachable ref kind: {kind!r}")
+                        raise AssertionError(f"unreachable ref kind: {ref[0]!r}")
 
                     self._id_meta[self._latest_id] = RefMeta(
                         file=callsite.file,
@@ -88,7 +93,7 @@ class RefRegistrar(RefLookup):
                     self._latest_id += 1
 
                 if self.debug[LOG_VERBOSITY] == 3:
-                    self.log_registered_name(name, callsite)
+                    self.log_registered_name(name, label, callsite)
 
                 if self._label_is_active[label]:
                     self.update_values(
