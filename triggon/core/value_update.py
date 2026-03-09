@@ -1,7 +1,6 @@
 from collections.abc import Mapping, MutableMapping
 from typing import TYPE_CHECKING, Any
 
-from .._internal import LOG_VERBOSITY, UPDATE_LOCK
 from .._internal._types.aliases import UpdateRefs
 from .._internal._types.structs import (
     AttrRef,
@@ -11,6 +10,8 @@ from .._internal._types.structs import (
     RefsByKind,
     VarRef,
 )
+from .._internal.keys import LOG_VERBOSITY
+from .._internal.lock import UPDATE_LOCK
 from ..errors.public import UpdateError
 from ..trigfunc import TRIGFUNC_ATTR
 
@@ -66,6 +67,7 @@ class ValueUpdater:
                         prev_value = getattr(ref.parent_obj, ref.attr_name)
                         if prev_value == new_value:
                             continue
+
                         if set_true and hasattr(new_value, TRIGFUNC_ATTR):
                             setattr(ref.parent_obj, ref.attr_name, new_value.run())
                         else:
@@ -75,11 +77,12 @@ class ValueUpdater:
                     else:
                         target_name = ref.full_name
                 elif isinstance(ref, VarRef):
-                    # update local/global variables
+                    # update global variables
                     try:
                         prev_value = f_globals[ref.var_name]
                         if prev_value == new_value:
                             continue
+
                         if set_true and hasattr(new_value, TRIGFUNC_ATTR):
                             f_globals[ref.var_name] = new_value.run()
                         else:
