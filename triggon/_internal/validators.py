@@ -65,9 +65,9 @@ def check_items(arg_name: str, arg: Any) -> None:
                 )
             for key_2, val_2 in val.items():
                 if not isinstance(key_2, str):
-                    _raise_type_error(arg_name, type_msg="str", key=key)
+                    _raise_type_error(arg_name, type_msg="str", key=key_2)
                 if not isinstance(val_2, int):
-                    _raise_type_error(arg_name, type_msg="int", actual_value=val_2, key=key)
+                    _raise_type_error(arg_name, type_msg="int", actual_value=val_2, key=key_2)
                 _ensure_non_negative(val_2, arg_name="index")
 
 
