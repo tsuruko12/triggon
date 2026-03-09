@@ -64,7 +64,7 @@ class _Core:
                     else:
                         obj = self.resolve_value(name, obj)
                 except NameError:
-                    # Retry using the current user frame
+                    # retry using the current user frame
                     try:
                         frame = get_target_frame()
                         if obj is _NO_VALUE:
@@ -73,10 +73,11 @@ class _Core:
                             obj = self.resolve_value(name, obj, frame=frame)
                     finally:
                         frame = None
-            else:
-                # 'call'
+            elif v[0] == "call":
                 args, kwargs = v[1], v[2]
                 obj = cast(Callable[..., Any], obj)(*args, **kwargs)
+            else:
+                raise AssertionError(f"unreachable kind key: {v[0]!r}")
 
         return obj
 
