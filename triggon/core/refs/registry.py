@@ -19,8 +19,6 @@ from .lookup import RefLookup
 class RefRegistrar(RefLookup):
     debug: DebugConfig
     _label_is_active: dict[str, bool]
-    _label_refs: dict[str, RefsByKind]
-    _id_meta: dict[int, RefMeta]
     _lock: threading.Lock
 
     if TYPE_CHECKING:
