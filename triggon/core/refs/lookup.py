@@ -1,8 +1,8 @@
 from typing import cast
 
-from ..._internal import ATTR, VAR
 from ..._internal._types.aliases import UpdateRefs
 from ..._internal._types.structs import AttrRef, RefMeta, RefsByKind, VarRef
+from ..._internal.keys import ATTR, GLOB_VAR
 
 
 class RefLookup:
@@ -27,7 +27,7 @@ class RefLookup:
 
         for value in target_values:
             for kind, refs in value.items():
-                if kind == VAR:
+                if kind == GLOB_VAR:
                     matched_var_refs.extend(cast(VarRef, refs))
                 elif kind == ATTR:
                     matched_attr_refs.extend(cast(AttrRef, refs))
@@ -48,8 +48,6 @@ class RefLookup:
             if ref.var_name != target_name:
                 continue
             if ref.ref_id in target_ids:
-                continue
-            if self._id_meta[ref.ref_id].func_name == func_name:
                 return True
 
         for ref in target_attr_refs:
@@ -67,7 +65,7 @@ class RefLookup:
 
         update_refs = []
 
-        for ref in label_refs[VAR]:
+        for ref in label_refs[GLOB_VAR]:
             if self._id_meta[ref.ref_id].file != file:
                 continue
             update_refs.append(ref)
