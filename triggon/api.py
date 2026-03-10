@@ -49,7 +49,7 @@ from ._internal.keys import (
 from ._internal.sentinel import _NO_VALUE
 from .core.mixins import _Core
 from .errors.public import InactiveCaptureError, InvalidArgumentError, RollbackNotSupportedError
-from .trigfunc import TRIGFUNC_ATTR
+from .trigfunc import TRIGFUNC_ATTR, TrigFunc
 
 
 class _EarlyReturn(Exception):
@@ -59,6 +59,7 @@ class _EarlyReturn(Exception):
 @dataclass(slots=True)
 class _EarlyReturnState:
     """Internal state for capture_return()."""
+
     active: bool = False
     value: Any = None
 
@@ -66,6 +67,7 @@ class _EarlyReturnState:
 @dataclass(slots=True)
 class EarlyReturnResult:
     """Result returned by capture_return()."""
+
     triggered: bool = False
     value: Any = None
 
@@ -780,3 +782,56 @@ class Triggon(_Core, _Internal):
             self.log_early_return(target_label, return_val, callsite)
 
         raise _EarlyReturn
+
+    def trigger_call(
+        self,
+        labels: LabelArg,
+        /,
+        target: TrigFunc,
+    ) -> Any:
+        """Run a deferred `TrigFunc` when one of the labels is active.
+
+        Args:
+            labels (str | Sequence[str]):
+                Labels to check before running `target`. Labels must not start
+                with `*`.
+            target (TrigFunc):
+                A deferred `TrigFunc` instance to run.
+
+        Returns:
+            Any: The result of `target.run()` if one of the labels is active.
+            Returns `None` when no given label is active.
+
+        Raises:
+            TypeError:
+                If `target` is not a deferred `TrigFunc` instance, or if it
+                does not satisfy the call requirements for this method.
+            InvalidArgumentError:
+                If `labels` is invalid or any label starts with `*`.
+            UnregisteredLabelError:
+                If any given label is not registered.
+        """
+
+        if not hasattr(target, TRIGFUNC_ATTR):
+            raise TypeError("target must be deferred using a TrigFunc instance")
+
+        check_str_sequence(arg_name="labels", args=labels)
+        labels, _ = self.resolve_labels_and_idxs(labels, idxs=None, allow_symbol=False)
+
+        target_label = None
+        for label in labels:
+            if self._label_is_active[label]:
+                target_label = label
+                break
+        if target_label is None:
+            return
+        
+        if self.debug[LOG_VERBOSITY] != 0:
+            assert target._trigcall is not None     
+            target_name = target._trigcall.name
+            frame = get_target_frame()
+            callsite = get_callsite(frame)
+            
+            self.log_triggered_call(target_label, target_name, callsite)
+
+        return target.run()
