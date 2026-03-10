@@ -149,7 +149,7 @@ class LabelFlagController:
             elif not toggle_act.set_true and not self._label_is_active[label]:
                 continue
 
-            if debug_on:
+            if after != 0 and debug_on:
                 self.log_label_flag_change(
                     label,
                     callsite,
@@ -203,7 +203,7 @@ class LabelFlagController:
                     else:
                         toggled = False
 
-                if debug_on:
+                if toggled and debug_on:
                     self.log_label_flag_change(
                         label,
                         toggle_act.callsite,
