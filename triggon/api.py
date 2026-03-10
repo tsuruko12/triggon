@@ -57,14 +57,6 @@ class _EarlyReturn(Exception):
 
 
 @dataclass(slots=True)
-class _EarlyReturnState:
-    """Internal state for capture_return()."""
-
-    active: bool = False
-    value: Any = None
-
-
-@dataclass(slots=True)
 class EarlyReturnResult:
     """Result returned by capture_return()."""
 
@@ -84,7 +76,7 @@ class Triggon(_Core, _Internal):
     _label_refs: dict[str, RefsByKind]
     _id_meta: dict[int, RefMeta]
     _latest_id: int
-    _capture_return_state: _EarlyReturnState
+    _return_val_stack: list[Any]
     _lock: threading.Lock
 
     def __init__(
@@ -154,7 +146,7 @@ class Triggon(_Core, _Internal):
         self._label_refs = {}
         self._id_meta = {}
         self._latest_id = 1
-        self._capture_return_state = _EarlyReturnState()
+        self._return_val_stack = []
         self._lock = threading.Lock()
 
         self._normalize_label_values(labels, new_values)
@@ -404,7 +396,7 @@ class Triggon(_Core, _Internal):
                 idx = i
                 break
 
-        debug_on = self.debug[LOG_VERBOSITY] >= 1
+        debug_on = self.debug[LOG_VERBOSITY] >= 2
 
         if target_label is None:
             if debug_on:
@@ -437,8 +429,9 @@ class Triggon(_Core, _Internal):
 
         Args:
             label (str):
-                The label to associate with the variable or attribute. Labels
-                must not start with `*`.
+                The label to associate with the variable or attribute. If the
+                label starts with `*`, the number of leading `*` characters is
+                treated as its index.
             name (str):
                 The target name to register. This may be a variable name or an
                 attribute path.
@@ -449,7 +442,7 @@ class Triggon(_Core, _Internal):
         Raises:
             InvalidArgumentError:
                 If `name` starts from a local variable, if the attribute path is
-                invalid, if `index` is invalid, or if `label` starts with `*`.
+                invalid, or if `index` is invalid.
             NameError:
                 If the root name in `name` does not exist.
             UnregisteredLabelError:
@@ -695,7 +688,8 @@ class Triggon(_Core, _Internal):
             EarlyReturnResult: The result object for the captured return.
         """
 
-        self._capture_return_state.active = True
+        # Initialize the default return value to None
+        self._return_val_stack.append(None)
         result = EarlyReturnResult()
 
         try:
@@ -703,13 +697,13 @@ class Triggon(_Core, _Internal):
         except _EarlyReturn:
             result.triggered = True
 
-            value = self._capture_return_state.value
+            value = self._return_val_stack[-1]
             if value is not None and hasattr(value, TRIGFUNC_ATTR):
                 result.value = value._run()
             else:
                 result.value = value
         finally:
-            self._capture_return_state.active = False
+            self._return_val_stack.pop()
 
     def trigger_return(
         self,
@@ -749,7 +743,7 @@ class Triggon(_Core, _Internal):
                 If any given label is not registered.
         """
 
-        if not self._capture_return_state.active:
+        if not self._return_val_stack:
             raise InactiveCaptureError()
 
         check_str_sequence("labels", labels)
@@ -774,7 +768,7 @@ class Triggon(_Core, _Internal):
         else:
             return_val = self._new_values[target_label][target_idx]
 
-        self._capture_return_state.value = return_val
+        self._return_val_stack[-1] = return_val
 
         if self.debug[LOG_VERBOSITY] != 0:
             frame = get_target_frame()
