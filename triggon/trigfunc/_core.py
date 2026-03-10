@@ -52,6 +52,8 @@ class _Core:
     def run(self) -> Any:
         if self._trigcall is None:
             raise TypeError("no deferred target to execute")
+        if self._trigcall.target[-1][0] != "call":
+            raise TypeError("deferred target must end with a function or method call")
 
         obj = _NO_VALUE
 
