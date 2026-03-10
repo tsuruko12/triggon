@@ -21,7 +21,7 @@ class _Core:
     _f_locals: Mapping[str, Any]
     _f_globals: Mapping[str, Any]
 
-    def resolve_value(
+    def _resolve_value(
         self,
         name: str,
         obj: Any = _NO_VALUE,
@@ -49,7 +49,7 @@ class _Core:
 
         return value
 
-    def run(self) -> Any:
+    def _run(self) -> Any:
         if self._trigcall is None:
             raise TypeError("no deferred target to execute")
         if self._trigcall.target[-1][0] != "call":
@@ -62,17 +62,17 @@ class _Core:
                 name = v[1]
                 try:
                     if obj is _NO_VALUE:
-                        obj = self.resolve_value(name)
+                        obj = self._resolve_value(name)
                     else:
-                        obj = self.resolve_value(name, obj)
+                        obj = self._resolve_value(name, obj)
                 except NameError:
                     # retry using the current user frame
                     try:
                         frame = get_target_frame()
                         if obj is _NO_VALUE:
-                            obj = self.resolve_value(name, frame=frame)
+                            obj = self._resolve_value(name, frame=frame)
                         else:
-                            obj = self.resolve_value(name, obj, frame=frame)
+                            obj = self._resolve_value(name, obj, frame=frame)
                     finally:
                         frame = None
             elif v[0] == "call":
