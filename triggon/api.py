@@ -415,7 +415,7 @@ class Triggon(_Core, _Internal):
         new_value = self._new_values[target_label][idx]
 
         if hasattr(new_value, TRIGFUNC_ATTR):
-            new_value = new_value.run()
+            new_value = new_value._run()
         if debug_on:
             self.store_debug_state(original_val, new_value, target_label, idx)
 
@@ -705,7 +705,7 @@ class Triggon(_Core, _Internal):
 
             value = self._capture_return_state.value
             if value is not None and hasattr(value, TRIGFUNC_ATTR):
-                result.value = value.run()
+                result.value = value._run()
             else:
                 result.value = value
         finally:
@@ -799,7 +799,7 @@ class Triggon(_Core, _Internal):
                 A deferred `TrigFunc` instance to run.
 
         Returns:
-            Any: The result of `target.run()` if one of the labels is active.
+            Any: The result of `target._run()` if one of the labels is active.
             Returns `None` when no given label is active.
 
         Raises:
@@ -831,7 +831,7 @@ class Triggon(_Core, _Internal):
             target_name = target._trigcall.name
             frame = get_target_frame()
             callsite = get_callsite(frame)
-            
+
             self.log_triggered_call(target_label, target_name, callsite)
 
-        return target.run()
+        return target._run()
