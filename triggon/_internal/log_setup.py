@@ -10,6 +10,10 @@ from ._types.structs import DebugConfig
 from .keys import LOG_FILE, LOG_LABELS, LOG_VERBOSITY
 from .lock import UPDATE_LOCK
 
+# Trigger logs appear at all levels.
+# Value update logs appear at level 2 and above.
+# Delay logs appear only at level 3.
+
 type LogConfigTuple = tuple[int, LogFile, TargetLabels]
 
 DEBUG_LOG_FMT = (
