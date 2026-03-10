@@ -68,7 +68,7 @@ class ValueUpdater:
                             continue
 
                         if set_true and hasattr(new_value, TRIGFUNC_ATTR):
-                            setattr(ref.parent_obj, ref.attr_name, new_value.run())
+                            setattr(ref.parent_obj, ref.attr_name, new_value._run())
                         else:
                             setattr(ref.parent_obj, ref.attr_name, new_value)
                     except (AttributeError, TypeError, ValueError) as e:
@@ -83,7 +83,7 @@ class ValueUpdater:
                             continue
 
                         if set_true and hasattr(new_value, TRIGFUNC_ATTR):
-                            f_globals[ref.var_name] = new_value.run()
+                            f_globals[ref.var_name] = new_value._run()
                         else:
                             f_globals[ref.var_name] = new_value
                     except KeyError as e:
