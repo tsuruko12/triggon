@@ -8,13 +8,11 @@ TRIGFUNC_ATTR = "__trigfunc__"
 
 
 class TrigFunc(_Core):
-    """
-    Records attribute and call chains for deferred execution.
+    """Record deferred attribute and call chains.
 
-    This class does not execute targets or perform name resolution
-    or callability checks when building the chain.
-    Attribute access and calls are recorded as a chain
-    and evaluated only when the chain is executed.
+    `TrigFunc` stores attribute access and call steps without resolving or
+    executing them while the chain is being built. The recorded chain can be
+    passed to APIs that execute deferred targets later.
 
     Examples:
         >>> chain_1 = TrigFunc().func()
@@ -23,9 +21,16 @@ class TrigFunc(_Core):
         >>> chain_3 = f.A(10).method(20)
 
     Raises:
-        TypeError: If a call is recorded before any target is bound.
-        NameError: If a root name cannot be resolved during execution.
-        AttributeError: If a root name cannot be resolved during execution.
+        TypeError:
+            If a call is recorded before any target is bound, or if the
+            deferred chain is executed before a target is bound or does not end
+            with a call.
+        NameError:
+            If a root name in the deferred chain does not exist when the chain
+            is executed.
+        AttributeError:
+            If an attribute in the deferred chain does not exist when the chain
+            is executed.
     """
 
     _trigcall: _TrigCall | None
