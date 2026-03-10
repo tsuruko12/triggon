@@ -7,7 +7,6 @@ from .._internal._types.structs import (
     Callsite,
     DebugConfig,
     RefMeta,
-    RefsByKind,
     VarRef,
 )
 from .._internal.keys import LOG_VERBOSITY
