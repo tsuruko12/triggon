@@ -1,6 +1,6 @@
-from .debug import DebugLogger
+from .debug.logger import DebugLogger
 from .label import LabelValidator
-from .log_setup import LogSetup
+from .debug.setup import LogSetup
 
 
 class _Internal(LabelValidator, LogSetup, DebugLogger):
