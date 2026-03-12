@@ -456,7 +456,7 @@ class Triggon(_Core, _Internal):
         label_tup, index_tup = self.resolve_labels_and_idxs(label, index)
 
         label_to_refs = {label_tup[0]: {name: index_tup[0]}}
-        self.register_ref_map(label_to_refs)
+        self.register_target_refs(label_to_refs)
 
     def register_refs(self, label_to_refs: LabelToRefs, /) -> None:
         """Register multiple variables or attributes at once.
@@ -486,7 +486,7 @@ class Triggon(_Core, _Internal):
 
         for label, refs in label_to_refs.items():
             self.resolve_labels_and_idxs(label, tuple(refs.values()), allow_symbol=False)
-        self.register_ref_map(label_to_refs)
+        self.register_target_refs(label_to_refs)
 
     def is_registered(
         self,
@@ -496,8 +496,9 @@ class Triggon(_Core, _Internal):
     ) -> bool:
         """Return whether variable or attribute names are registered.
 
-        Registration is checked by name, not by the current value or object
-        state of the target.
+        Registration is checked by target name within the current file and
+        callsite scope, not by the current value or object state of the
+        target.
 
         Args:
             names (str | Sequence[str]):
@@ -521,9 +522,12 @@ class Triggon(_Core, _Internal):
         """
 
         unwrapped_names = unwrap_value(names)
+        if isinstance(unwrapped_names, str):
+            unwrapped_names = (unwrapped_names,)
         check_str_sequence(arg_name="names", args=names)
+
         if label is not None:
-            check_str_sequence(arg_name="label", args=label)
+            check_str_sequence(arg_name="label", args=label, allow_multi=False)
             self.resolve_labels_and_idxs(label, idxs=None, allow_symbol=False)
         check_bool(arg_name="match_all", arg=match_all)
 
@@ -540,7 +544,7 @@ class Triggon(_Core, _Internal):
                     target_ids,
                     target_var_refs,
                     target_attr_refs,
-                    callsite.func_name,
+                    callsite.scope_name,
                 )
                 if not registered:
                     return False
@@ -553,11 +557,54 @@ class Triggon(_Core, _Internal):
                 target_ids,
                 target_var_refs,
                 target_attr_refs,
-                callsite.func_name,
+                callsite.scope_name,
             )
             if registered:
                 return True
         return False
+
+    def unregister_refs(self, names: NameArg, labels: LabelArg | None = None) -> None:
+        """Unregister variable or attribute names from labels.
+
+        When `labels` is omitted, the given names are removed from all
+        registered labels. Each name may be a variable name or an attribute
+        path. Removal is based on the registered target name within the
+        current file and callsite scope, not on the current value or object
+        state.
+
+        Args:
+            names (str | Sequence[str]):
+                One or more target names to unregister.
+            labels (str | Sequence[str] | None, optional):
+                Labels from which to remove the given names. If omitted, all
+                registered labels are targeted. Labels must not start with `*`.
+
+        Raises:
+            InvalidArgumentError:
+                If `names` or `labels` is invalid, or if any given label starts
+                with `*`.
+            UnregisteredLabelError:
+                If any given label is not registered.
+        """
+
+        check_str_sequence(arg_name="names", args=names)
+
+        if labels is not None:
+            check_str_sequence(arg_name="labels", args=labels)
+            labels, _ = self.resolve_labels_and_idxs(labels, idxs=None, allow_symbol=False)
+        else:
+            labels = tuple(self._label_refs.keys())
+
+        if isinstance(names, str):
+            names = (names,)
+
+        frame = get_target_frame()
+        callsite = get_callsite(frame)
+        target_ids = self.get_ids_by_file(callsite.file)
+
+        for label in labels:
+            with self._lock:
+                self.unregister_target_refs(label, names, target_ids, callsite)
 
     def revert(
         self,
@@ -819,9 +866,9 @@ class Triggon(_Core, _Internal):
                 break
         if target_label is None:
             return
-        
+
         if self.debug[LOG_VERBOSITY] != 0:
-            assert target._trigcall is not None     
+            assert target._trigcall is not None
             target_name = target._trigcall.name
             frame = get_target_frame()
             callsite = get_callsite(frame)
