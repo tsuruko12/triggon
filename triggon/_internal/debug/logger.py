@@ -155,7 +155,7 @@ class DebugLogger:
 
         self._logger.debug(TRIG_EARLY_RET.format(value=value), extra=_build_log_extra(callsite))
 
-    def log_triggered_call(self, label: str, target_name: str, callsite: Callsite) -> None:
+    def log_trigger_call(self, label: str, target_name: str, callsite: Callsite) -> None:
         if not self._is_target_label(label):
             return
 
