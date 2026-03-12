@@ -6,15 +6,17 @@ from typing import Any
 from ...trigfunc import TRIGFUNC_ATTR
 from .._types.structs import Callsite, DebugConfig
 from ..frames import get_callsite, get_target_frame
-from .setup import LOG_LABELS
 from ..sentinel import _NO_VALUE
+from .setup import LOG_LABELS
 
 TRIGGER_LOG = "Label {label} is {state}"
 DELAY_TRIGGER_LOG = "Label {label} will be {state} after {sec}s"
 
 SWITCH_LIT_LOG = "{prev_value} -> {new_value}"
 UPDATE_REF_LOG = "{var}: " + SWITCH_LIT_LOG
+
 REGISTER_REF_LOG = "{name} was registered under label {label}"
+UNREGISTER_REF_LOG = "{name} was unregistered from label {label}"
 
 TRIG_EARLY_RET = "Early return triggered (return_value={value})"
 TRIG_CALL = "Trigger call executed (target={target})"
@@ -65,8 +67,11 @@ class DebugLogger:
         self._logger.debug(log_msg, extra=_build_log_extra(callsite))
 
     def log_registered_name(self, target_name: str, label: str, callsite: Callsite) -> None:
-        # verbosity level 3 only
         log_msg = REGISTER_REF_LOG.format(name=repr(target_name), label=repr(label))
+        self._logger.debug(log_msg, extra=_build_log_extra(callsite))
+
+    def log_unregistered_name(self, target_name: str, label: str, callsite: Callsite) -> None:
+        log_msg = UNREGISTER_REF_LOG.format(name=repr(target_name), label=repr(label))
         self._logger.debug(log_msg, extra=_build_log_extra(callsite))
 
     def log_value_update(
@@ -159,7 +164,7 @@ class DebugLogger:
 
 def _build_log_extra(callsite: Callsite) -> dict[str, str | int]:
     extra_data = {
-        "caller_func": callsite.func_name,
+        "caller_func": callsite.scope_name,
         "caller_file": os.path.basename(callsite.file),
         "caller_line": callsite.lineno,
     }
