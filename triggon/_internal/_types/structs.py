@@ -21,7 +21,7 @@ class AttrRef(NamedTuple):
 
 class RefMeta(NamedTuple):
     file: str
-    func_name: str
+    scope_name: str
     orig_val: Any
     idx: int
 
@@ -29,7 +29,7 @@ class RefMeta(NamedTuple):
 class Callsite(NamedTuple):
     file: str
     lineno: int
-    func_name: str
+    scope_name: str
     lasti: int | None
 
 
@@ -56,3 +56,4 @@ class DelayState:
     timer: Timer | None = None
     cur_timer_id: int = 0
     labels: tuple[str, ...] | None = None
+
