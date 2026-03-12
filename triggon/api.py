@@ -873,6 +873,6 @@ class Triggon(_Core, _Internal):
             frame = get_target_frame()
             callsite = get_callsite(frame)
 
-            self.log_triggered_call(target_label, target_name, callsite)
+            self.log_trigger_call(target_label, target_name, callsite)
 
         return target._run()
