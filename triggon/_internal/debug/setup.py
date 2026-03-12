@@ -12,7 +12,7 @@ from ..lock import UPDATE_LOCK
 
 # Trigger logs appear at all levels.
 # Value update logs appear at level 2 and above.
-# Delay logs appear only at level 3.
+# Delay logs and variable/attribute register/unregister logs appear only at level 3.
 
 type LogConfigTuple = tuple[int, LogFile, TargetLabels]
 
