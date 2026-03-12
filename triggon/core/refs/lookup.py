@@ -2,7 +2,7 @@ from typing import cast
 
 from ..._internal._types.aliases import UpdateRefs
 from ..._internal._types.structs import AttrRef, RefMeta, RefsByKind, VarRef
-from ..._internal.keys import ATTR, GLOB_VAR
+from ..._internal.keys import ATTR, GLOB_VAR, MODULE_SCOPE
 
 
 class RefLookup:
@@ -42,7 +42,7 @@ class RefLookup:
         target_ids: set[int],
         target_var_refs: tuple[VarRef, ...],
         target_attr_refs: tuple[AttrRef, ...],
-        func_name: str,
+        target_scope_name: str,
     ) -> bool:
         for ref in target_var_refs:
             if ref.var_name != target_name:
@@ -55,7 +55,9 @@ class RefLookup:
                 continue
             if ref.ref_id not in target_ids:
                 continue
-            if self._id_meta[ref.ref_id].func_name == func_name:
+            
+            scope_name = self._id_meta[ref.ref_id].scope_name
+            if scope_name == target_scope_name or scope_name == MODULE_SCOPE:
                 return True
 
         return False
