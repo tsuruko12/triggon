@@ -8,7 +8,6 @@ from .structs import AttrRef, VarRef
 type DelayKey = Literal["trigger", "revert"]
 type NumArg = Literal["after", "index", "indices"]
 type VarKey = Literal["glob_var", "loc_var"]
-type AttrKey = Literal["attr"]
 
 # References
 type UpdateRefs = list[VarRef | AttrRef]
