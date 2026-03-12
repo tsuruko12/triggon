@@ -1,15 +1,25 @@
 import ast
 import inspect
 from types import FrameType
-from typing import Any
+from typing import Any, NamedTuple
 
-from .._internal._types.aliases import AttrKey, VarKey
-from .._internal.keys import ATTR, GLOB_VAR, LOC_VAR
+from .._internal._types.aliases import VarKey
+from .._internal.keys import GLOB_VAR, LOC_VAR, MODULE_SCOPE
 from .._internal.sentinel import _NO_VALUE
 from ..errors.public import InvalidArgumentError
 
-type VarResult = tuple[VarKey, Any]  # ('glob_var' or 'loc_var', value)
-type AttrResult = tuple[AttrKey, Any, str, Any]  # ('attr', value, attr name, parent_obj)
+
+class VarResult(NamedTuple):
+    kind: VarKey
+    value: Any
+    scope_name: str
+
+
+class AttrResult(NamedTuple):
+    value: Any
+    attr_name: str
+    parent_obj: Any
+    scope_name: str
 
 
 ALLOWED_FUNCS = {
@@ -166,28 +176,33 @@ def resolve_ref_info(
         has_attr_chain = False
 
     value = frame.f_locals.get(target_name, _NO_VALUE)
+    scope_name = frame.f_code.co_name
 
     if value is not _NO_VALUE and not has_attr_chain:
         if not allow_loc_var:
             if frame.f_globals is not frame.f_locals:
-                raise InvalidArgumentError(f"local variables cannot be registered: {target_name!r}")
+                raise InvalidArgumentError(
+                    f"local variables cannot be registered: {target_name!r}"
+                )
         else:
-            return LOC_VAR, value
+            return VarResult(kind=LOC_VAR, value=value, scope_name=scope_name)
     if value is _NO_VALUE:
+        scope_name = MODULE_SCOPE
         value = frame.f_globals.get(target_name, _NO_VALUE)
         if value is _NO_VALUE:
             raise NameError(f"{target_name!r} is not defined")
 
     if has_attr_chain:
-        return _walk_attr_chain(full_name, split_names, value)
-    return GLOB_VAR, value
+        val, attr_name, parent_obj = _walk_attr_chain(full_name, split_names, value)
+        return AttrResult(val, attr_name, parent_obj, scope_name)
+    return VarResult(kind=GLOB_VAR, value=value, scope_name=scope_name)
 
 
 def _walk_attr_chain(
     full_name: str,
     split_names: list[str],
     parent_obj: Any,
-) -> AttrResult:
+) -> tuple[Any, str, Any]:
     n = len(split_names)
     value = _NO_VALUE
 
@@ -199,4 +214,4 @@ def _walk_attr_chain(
     if inspect.isclass(value):
         raise InvalidArgumentError(f"name {full_name!r} must end with an attribute, not a class")
 
-    return ATTR, value, split_names[-1], parent_obj
+    return value, split_names[-1], parent_obj
