@@ -6,11 +6,10 @@ from dataclasses import dataclass
 from types import FrameType
 from typing import Any, Literal, cast
 
-from .._internal._types.aliases import AttrKey
 from .._internal.frames import get_target_frame
 from .._internal.sentinel import _NO_VALUE
 
-type AttrArg = tuple[AttrKey, str]
+type AttrArg = tuple[Literal["attr"], str]
 type CallArg = tuple[Literal["call"], tuple[Any, ...], dict[str, Any]]
 
 
