@@ -29,9 +29,9 @@ def get_target_frame(depth: int = 1) -> FrameType:
 def get_callsite(frame: FrameType, get_lasti: bool = False) -> Callsite:
     filename = frame.f_code.co_filename
     lineno = frame.f_lineno
-    func_name = frame.f_code.co_name
+    scope_name = frame.f_code.co_name
 
     if get_lasti:
         lasti = frame.f_lasti
-        return Callsite(filename, lineno, func_name, lasti)
-    return Callsite(filename, lineno, func_name, lasti=None)
+        return Callsite(filename, lineno, scope_name, lasti)
+    return Callsite(filename, lineno, scope_name, lasti=None)
