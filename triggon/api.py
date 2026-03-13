@@ -286,6 +286,8 @@ class Triggon(_Core, _Internal):
             InvalidArgumentError:
                 If no labels are specified when `all` is False, or if any
                 argument is invalid.
+            IndexError:
+                If any resolved index is out of range for its label.
             NameError:
                 If `cond` refers to a name that does not exist.
             AttributeError:
@@ -303,13 +305,13 @@ class Triggon(_Core, _Internal):
         else:
             labels_iter = self._new_values.keys()
 
-        labels, indices = self.resolve_labels_and_idxs(labels_iter, indices)
-
         check_idxs(indices)
         check_bool(arg_name="all", arg=all)
         check_cond(cond)
         check_after(after)
         check_bool(arg_name="reschedule", arg=reschedule)
+
+        labels, indices = self.resolve_labels_and_idxs(labels_iter, indices)
 
         label_to_idx = to_dict(labels, indices)
         self.set_label_flags(label_to_idx, cond, after, reschedule, set_true=True)
@@ -378,6 +380,8 @@ class Triggon(_Core, _Internal):
         Raises:
             InvalidArgumentError:
                 If `labels` or `indices` are invalid.
+            IndexError:
+                If any resolved index is out of range for its label.
             UnregisteredLabelError:
                 If any given label is not registered.
         """
@@ -443,6 +447,8 @@ class Triggon(_Core, _Internal):
             InvalidArgumentError:
                 If `name` starts from a local variable, if the attribute path is
                 invalid, or if `index` is invalid.
+            IndexError:
+                If the resolved index is out of range for the label.
             NameError:
                 If the root name in `name` does not exist.
             UnregisteredLabelError:
@@ -466,7 +472,7 @@ class Triggon(_Core, _Internal):
         instance, it is executed and its result is used.
 
         Args:
-            label_to_refs (Mapping[str, Mapping[str, int | None]]):
+            label_to_refs (Mapping[str, Mapping[str, int]]):
                 A mapping from labels to target names and the index of the
                 value to use if the label is already active when the target is
                 registered. Each target name may be a variable name or an
@@ -476,6 +482,8 @@ class Triggon(_Core, _Internal):
             InvalidArgumentError:
                 If `label_to_refs` is empty, has an invalid structure, contains an invalid
                 index, or contains a label that starts with `*`.
+            IndexError:
+                If any registered index is out of range for its label.
             NameError:
                 If the root name of a target does not exist.
             UnregisteredLabelError:
@@ -485,7 +493,10 @@ class Triggon(_Core, _Internal):
         check_items(arg_name="label_to_refs", arg=label_to_refs)
 
         for label, refs in label_to_refs.items():
-            self.resolve_labels_and_idxs(label, tuple(refs.values()), allow_symbol=False)
+            self.resolve_labels_and_idxs(label, idxs=None, allow_symbol=False)
+            for i in refs.values():
+                self.validate_idx_range(label, i)
+
         self.register_target_refs(label_to_refs)
 
     def is_registered(
@@ -524,7 +535,7 @@ class Triggon(_Core, _Internal):
         unwrapped_names = unwrap_value(names)
         if isinstance(unwrapped_names, str):
             unwrapped_names = (unwrapped_names,)
-        check_str_sequence(arg_name="names", args=names)
+        check_str_sequence(arg_name="names", args=unwrapped_names)
 
         if label is not None:
             check_str_sequence(arg_name="label", args=label, allow_multi=False)
@@ -645,6 +656,8 @@ class Triggon(_Core, _Internal):
             InvalidArgumentError:
                 If no labels are specified when `all` is False, or if any
                 argument is invalid.
+            IndexError:
+                If any resolved index from prefixed labels is out of range for its label.
             NameError:
                 If `cond` refers to a name that does not exist.
             AttributeError:
@@ -714,6 +727,7 @@ class Triggon(_Core, _Internal):
             if isinstance(targets, str):
                 targets = (targets,)
 
+        # Add 1 to depth to account for @contextmanager
         frame = get_target_frame(depth=2)
         name_to_refs = collect_rollback_refs(frame, targets)
 
@@ -786,6 +800,8 @@ class Triggon(_Core, _Internal):
             InvalidArgumentError:
                 If `labels` or `indices` are invalid, or if any label starts
                 with `*`.
+            IndexError:
+                If any given index is out of range for its label.
             UnregisteredLabelError:
                 If any given label is not registered.
         """
@@ -807,9 +823,9 @@ class Triggon(_Core, _Internal):
                 if indices is not None:
                     target_idx = idxs[i]
                 break
+
         if target_label is None:
             return
-
         if target_idx is None:
             return_val = value
         else:
