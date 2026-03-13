@@ -4,7 +4,7 @@ from pathlib import Path
 from types import FrameType
 from typing import Any
 
-from ..core.value_resolver import resolve_ref_info
+from ..core.value_resolver import AttrResult, VarResult, resolve_ref_info
 from ..errors.public import InvalidArgumentError, UpdateError
 from .keys import ATTR, GLOB_VAR, LOC_VAR
 
@@ -12,7 +12,7 @@ from .keys import ATTR, GLOB_VAR, LOC_VAR
 def collect_rollback_refs(
     frame: FrameType,
     target_names: Sequence[str] | None,
-) -> Mapping[str, Any]:
+) -> Mapping[str, VarResult | AttrResult]:
     filename = frame.f_code.co_filename
     lineno = frame.f_lineno
     node = _find_with_node(filename, lineno)
@@ -31,22 +31,20 @@ def collect_rollback_refs(
     return name_to_refs
 
 
-def revert_targets(frame: FrameType, name_to_refs: Mapping[str, Any]) -> None:
+def revert_targets(frame: FrameType, name_to_refs: Mapping[str, VarResult | AttrResult]) -> None:
     for name, ref in name_to_refs.items():
-        if ref[0] == ATTR:
-            kind, value, attr_name, parent_obj = ref
+        if isinstance(ref, AttrResult):
             try:
-                setattr(parent_obj, attr_name, value)
+                setattr(ref.parent_obj, ref.attr_name, ref.value)
             except (AttributeError, TypeError, ValueError) as e:
                 raise UpdateError(name, e) from None
-        else:
-            kind, value = ref
-            if kind == GLOB_VAR:
-                frame.f_globals[name] = value
-            elif kind == LOC_VAR:
-                frame.f_locals[name] = value
+        elif isinstance(ref, VarResult):
+            if ref.kind == GLOB_VAR:
+                frame.f_globals[name] = ref.value
+            elif ref.kind == LOC_VAR:
+                frame.f_locals[name] = ref.value
             else:
-                raise AssertionError(f"unreachable kind key: {kind!r}")
+                raise AssertionError(f"unreachable ref type: {type(ref)!r}")
 
 
 def _find_with_node(filename: str, lineno: int) -> ast.With:
