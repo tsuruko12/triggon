@@ -23,7 +23,6 @@ class RefMeta(NamedTuple):
     file: str
     scope_name: str
     orig_val: Any
-    idx: int
 
 
 class Callsite(NamedTuple):
