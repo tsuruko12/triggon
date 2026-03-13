@@ -2,11 +2,10 @@ import ast
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from types import FrameType
-from typing import Any
 
 from ..core.value_resolver import AttrResult, VarResult, resolve_ref_info
 from ..errors.public import InvalidArgumentError, UpdateError
-from .keys import ATTR, GLOB_VAR, LOC_VAR
+from .keys import GLOB_VAR, LOC_VAR
 
 
 def collect_rollback_refs(
