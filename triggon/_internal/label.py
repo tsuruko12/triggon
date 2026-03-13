@@ -22,18 +22,18 @@ class LabelValidator:
         if isinstance(idxs, int):
             idxs = (idxs,)
 
-        orig_labels = tuple(labels)  # keep original labels before stripping
+        # keep original labels before stripping
+        orig_labels = tuple(labels)
 
         labels, counts = self._strip_prefix_symbols(labels, allow_symbol)
 
         if idxs is None:
             # use symbol counts as idxs
-            check_idx_range = False
             idxs = counts
         else:
-            check_idx_range = True
-
-        assert isinstance(idxs, Sequence)
+            assert isinstance(idxs, Sequence)
+            if len(labels) != len(idxs):
+                raise InvalidArgumentError("labels and indices must have the same length")
 
         for i, label in enumerate(labels):
             _validate_label(label)
@@ -42,8 +42,7 @@ class LabelValidator:
                 continue
 
             self.ensure_labels_exist(label, orig_labels[i])
-            if check_idx_range:
-                self._validate_idx_range(label, idxs[i])
+            self.validate_idx_range(label, idxs[i])
 
         return tuple(labels), tuple(idxs)
 
@@ -81,7 +80,7 @@ class LabelValidator:
         if label not in self._new_values:
             raise UnregisteredLabelError(label, orig_label)
 
-    def _validate_idx_range(self, label: str, idx: int) -> None:
+    def validate_idx_range(self, label: str, idx: int) -> None:
         label_values = self._new_values[label]
         if len(label_values) - 1 < idx:
             raise IndexError(f"index {idx} is out of range for label {label!r}")
