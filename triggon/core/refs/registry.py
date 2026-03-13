@@ -87,7 +87,6 @@ class RefRegistrar(RefLookup):
                         callsite.file,
                         ref.scope_name,
                         orig_val=ref.value,
-                        idx=idx,
                     )
                     self._latest_id += 1
 
