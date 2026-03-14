@@ -1,0 +1,462 @@
+Metadata-Version: 2.2
+Name: triggon
+Version: 2.0.0
+Summary: A label-based trigger library for value switching, deferred calls, early returns, and rollback.
+Author-email: Tsuruko <tsuruko-12@outlook.com>
+Maintainer-email: Tsuruko <tsuruko-12@outlook.com>
+License: MIT License
+        
+        Copyright (c) 2025 Tsuruko
+        
+        Permission is hereby granted, free of charge, to any person obtaining a copy
+        of this software and associated documentation files (the "Software"), to deal
+        in the Software without restriction, including without limitation the rights  
+        to use, copy, modify, merge, publish, distribute, sublicense, and/or sell      
+        copies of the Software, and to permit persons to whom the Software is         
+        furnished to do so, subject to the following conditions:                       
+        
+        The above copyright notice and this permission notice shall be included in     
+        all copies or substantial portions of the Software.                            
+        
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR     
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE    
+        AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER        
+        LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+        OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN     
+        THE SOFTWARE.
+Project-URL: Homepage, https://github.com/tsuruko12/triggon
+Project-URL: Source, https://github.com/tsuruko12/triggon
+Project-URL: Bug Tracker, https://github.com/tsuruko12/triggon/issues
+Project-URL: Changelog, https://github.com/tsuruko12/triggon/blob/main/CHANGELOG.md
+Keywords: trigger,label-switching,value-switching,deferred-execution,early-return,rollback,conditional-execution,runtime-switching
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Typing :: Typed
+Classifier: Operating System :: OS Independent
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
+# triggon
+[![PyPI](https://img.shields.io/pypi/v/triggon)](https://pypi.org/project/triggon/)
+![Python](https://img.shields.io/pypi/pyversions/triggon)
+![Python](https://img.shields.io/pypi/l/triggon)
+![Package Size](https://img.shields.io/badge/size-31kB-lightgrey)
+[![Downloads](https://pepy.tech/badge/triggon)](https://pepy.tech/project/triggon)
+
+## Overview
+This library dynamically switches values and functions at labeled trigger points.
+
+## Table of Contents
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [API Reference](#api-reference)
+  - [Triggon](#triggon)
+  - [TrigFunc](#trigfunc)
+  - [Debug Logging](#debug-logging)
+  - [Errors](#errors)
+- [License](#license)
+- [Author](#author)
+
+## Features
+- Switch literal values by label without scattering conditionals
+- Register global variables and attribute paths for automatic updates
+- Execute deferred functions through `TrigFunc`
+- Trigger early returns inside a scoped context manager
+- Schedule trigger and revert operations with optional conditions
+- Roll back temporary mutations with a context manager
+
+## Installation
+```bash
+pip install triggon
+```
+
+## Quick Start
+```python
+from triggon import Triggon
+
+tg = Triggon.from_labels({
+    "prod": "https://api.example.com",
+    "dev": "http://localhost:8000",
+})
+
+
+def get_base_url() -> str:
+    return tg.switch_lit(("prod", "dev"), "http://127.0.0.1:5000")
+
+
+print(get_base_url())
+# http://127.0.0.1:5000
+
+tg.set_trigger("dev")
+print(get_base_url())
+# http://localhost:8000
+```
+
+## API Reference
+### Triggon
+Create instances with one of these constructors:
+
+- `Triggon(label: LabelArg | None = None, /, new_values: Any = _NO_VALUE, *, label_values: Mapping[str, Any] | None = None, debug: DebugArg = False) -> None`
+- `Triggon(label, new_values=_NO_VALUE, *, label_values=None, debug=False)`
+- `Triggon.from_label(label, new_values, *, debug=False)`
+- `Triggon.from_labels(label_values, *, debug=False)`
+
+Constructor behavior:
+
+- A non-string sequence value becomes indexed values for that label.
+- Wrap a sequence in another sequence to keep it as one value.
+- Labels must not start with `*`.
+- `debug` accepts `False`, `True`, a single label string, or a sequence of labels.
+
+```python
+from triggon import Triggon
+
+tg = Triggon.from_labels({
+    "A": [10, 20, 30],
+    "B": ([1, 2],),
+})
+
+tg.set_trigger("A", indices=1)
+print(tg.switch_lit("A", 0, indices=1))
+# 20
+
+tg.set_trigger("B")
+print(tg.switch_lit("B", None))
+# [1, 2]
+```
+
+#### `set_trigger()`
+Activate one or more labels.
+
+```python
+set_trigger(
+    labels: LabelArg | None = None,
+    /,
+    *,
+    indices: IndexArg | None = None,
+    all: bool = False,
+    cond: str = "",
+    after: int | float = 0,
+    reschedule: bool = False,
+) -> None
+```
+
+Main options:
+
+- `indices`: explicit indices for each label
+- `all=True`: activate all registered labels
+- `cond`: evaluate a restricted boolean expression against the caller frame
+- `after`: delay activation in seconds
+- `reschedule=True`: replace an existing scheduled trigger for the same labels
+
+```python
+tg = Triggon.from_labels({"A": 10, "B": 20})
+
+tg.set_trigger(("A", "B"))
+print(tg.switch_lit(("A", "B"), 0))
+# 10
+```
+
+#### `is_triggered()`
+Check whether labels are currently active.
+
+```python
+is_triggered(*labels: LabelArg, match_all: bool = True) -> bool
+```
+
+```python
+tg = Triggon.from_labels({"A": 1, "B": 2})
+tg.set_trigger("B")
+
+print(tg.is_triggered("A"))
+# False
+print(tg.is_triggered("A", "B", match_all=False))
+# True
+```
+
+#### `switch_lit()`
+Return the active replacement value for the first active label, or the original value if none are active.
+
+```python
+switch_lit(
+    labels: LabelArg,
+    /,
+    original_val: Any,
+    *,
+    indices: IndexArg | None = None,
+) -> Any
+```
+
+- If multiple labels are active, the first active label in normalized order wins.
+- Deferred `TrigFunc` values are executed automatically.
+- Explicit `indices` take precedence over `*label` prefixes.
+
+```python
+tg = Triggon.from_label("mode", new_values=("dev", "prod"))
+
+print(tg.switch_lit("mode", "local"))
+# local
+
+tg.set_trigger("mode", indices=1)
+print(tg.switch_lit("mode", "local", indices=1))
+# prod
+```
+
+#### `register_ref()` and `register_refs()`
+Register global variables or attribute paths so that active labels update them automatically.
+
+```python
+register_ref(label: str, /, name: str, *, index: int | None = None) -> None
+register_refs(label_to_refs: LabelToRefs, /) -> None
+```
+
+Notes:
+
+- Plain local variables cannot be registered.
+- Attribute roots may come from the current local scope or globals.
+- If a label is already active, registration updates the target immediately.
+- Matching is based on the current file and callsite scope.
+
+```python
+from triggon import Triggon
+
+tg = Triggon.from_labels({"enabled": True, "name": "prod"})
+
+flag = False
+
+
+class Config:
+    value = "local"
+
+
+tg.register_ref("enabled", name="flag")
+tg.register_ref("name", name="Config.value")
+
+tg.set_trigger(("enabled", "name"))
+
+print(flag)
+# True
+print(Config.value)
+# prod
+```
+
+Use `register_refs()` for batch registration:
+
+```python
+tg.register_refs({
+    "enabled": {"flag": 0},
+    "name": {"Config.value": 0},
+})
+```
+
+#### `is_registered()`
+Check whether target names are registered in the current file and callsite scope.
+
+```python
+is_registered(*names: NameArg, label: str | None = None, match_all: bool = True) -> bool
+```
+
+- For global variables, matching is file-based.
+- For attribute paths, matching also considers the current callsite scope.
+- Checks are based on registered names, not current object state.
+
+```python
+tg = Triggon.from_label("A", new_values=1)
+tg.register_ref("A", name="flag")
+
+print(tg.is_registered("flag"))
+# True
+```
+
+#### `unregister_refs()`
+Remove one or more registered names from selected labels.
+
+```python
+unregister_refs(names: NameArg, labels: LabelArg | None = None) -> None
+```
+
+- `labels=None` removes the names from all registered labels.
+- Removal follows the same file and callsite-scope rules as `is_registered()`.
+
+```python
+tg.unregister_refs(("flag", "Config.value"))
+```
+
+#### `revert()`
+Deactivate labels and restore registered targets to their original values.
+
+```python
+revert(
+    labels: LabelArg | None = None,
+    /,
+    *,
+    all: bool = False,
+    disable: bool = False,
+    cond: str = "",
+    after: int | float = 0,
+    reschedule: bool = False,
+) -> None
+```
+
+Main options:
+
+- `all=True`: revert all labels
+- `disable=True`: keep labels permanently disabled until recreated
+- `cond`: revert only if the condition evaluates to true
+- `after`: delay the revert
+- `reschedule=True`: replace an existing scheduled revert
+
+```python
+tg = Triggon.from_label("A", new_values="active")
+
+tg.set_trigger("A")
+print(tg.switch_lit("A", "inactive"))
+# active
+
+tg.revert("A")
+print(tg.switch_lit("A", "inactive"))
+# inactive
+```
+
+#### `capture_return()` and `trigger_return()`
+Use `capture_return()` as a context manager, then call `trigger_return()` inside it to perform an early return-like escape.
+
+```python
+capture_return() -> ContextManager[EarlyReturnResult]
+trigger_return(
+    labels: LabelArg,
+    /,
+    *,
+    indices: IndexArg | None = None,
+    value: Any = None,
+) -> Any
+```
+
+- Outside the context, `trigger_return()` raises `InactiveCaptureError`.
+- Captured deferred `TrigFunc` values are executed automatically.
+
+```python
+tg = Triggon.from_label("skip", new_values=1)
+
+
+def sample(num: int):
+    with tg.capture_return() as result:
+        tg.set_trigger("skip", cond="num < 0")
+        tg.trigger_return("skip", value="negative")
+    tg.revert("skip")
+    return result.value if result.triggered else "non-negative"
+
+
+print(sample(-1))
+# negative
+print(sample(1))
+# non-negative
+```
+
+#### `trigger_call()`
+Execute a deferred `TrigFunc` target when one of the given labels is active.
+
+```python
+trigger_call(labels: LabelArg, /, target: TrigFunc) -> Any
+```
+
+```python
+from triggon import TrigFunc
+
+f = TrigFunc()
+tg = Triggon.from_label("A", new_values=1)
+
+tg.set_trigger("A")
+print(tg.trigger_call("A", target=f.len("hello")))
+# 5
+```
+
+#### `rollback()`
+Temporarily mutate names and restore them automatically when the context exits.
+
+```python
+rollback(targets: NameArg | None = None) -> ContextManager[Any]
+```
+
+- Requires CPython 3.13 or later.
+- You can pass explicit target names or let assignments inside the block be collected automatically.
+
+```python
+from triggon import Triggon
+
+x = 1
+
+with Triggon.rollback(("x",)):
+    x = 99
+    print(x)
+    # 99
+
+print(x)
+# 1
+```
+
+### TrigFunc
+`TrigFunc` builds deferred function or method calls without executing them immediately.
+
+```python
+TrigFunc() -> None
+```
+
+Typical uses:
+
+- Store a deferred value in label data for `switch_lit()`
+- Run a deferred call through `trigger_call()`
+- Return a deferred value through `trigger_return()`
+
+```python
+from triggon import TrigFunc, Triggon
+
+f = TrigFunc()
+tg = Triggon.from_label("A", new_values=f.len("abcd"))
+
+tg.set_trigger("A")
+print(tg.switch_lit("A", 0))
+# 4
+```
+
+### Debug Logging
+Enable debug output by passing `debug=` to `Triggon(...)`, `from_label()`, or `from_labels()`.
+
+- `debug=False`: disable logging
+- `debug=True`: read settings from environment, defaulting to verbosity `3`
+- `debug="A"` or `debug=("A", "B")`: restrict output to selected labels
+
+Environment variables:
+
+- `TRIGGON_LOG_VERBOSITY`
+  - `0`: off
+  - `1`: trigger, revert, early return, and trigger-call events
+  - `2`: also log value updates
+  - `3`: also log delayed actions and register/unregister events
+- `TRIGGON_LOG_FILE`: write logs to a file instead of stderr
+- `TRIGGON_LOG_LABELS`: comma-separated label filter when `debug=True`
+
+### Errors
+Public errors include:
+
+- `InvalidArgumentError`: Raised when a public API receives invalid arguments or an invalid argument combination.
+- `UnregisteredLabelError`: Raised when an operation refers to a label that has not been registered.
+- `InactiveCaptureError`: Raised when `trigger_return()` is called outside `capture_return()`.
+- `RollbackNotSupportedError`: Raised when `rollback()` is used on a Python runtime earlier than CPython 3.13.
+- `UpdateError`: Raised when a registered target cannot be updated or restored.
+
+## License
+This project is licensed under the MIT License.
+See [LICENSE](./LICENSE) for details.
+
+## Author
+Created by Tsuruko
+GitHub: [@tsuruko12](https://github.com/tsuruko12)
+X: [@tool_tsuruko12](https://x.com/tsuruko)
