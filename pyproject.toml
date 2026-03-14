@@ -5,20 +5,19 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "triggon"
 version = "2.0.0"
-description = "A label-based trigger library for dynamic value switching, deferred calls, and early returns."
+description = "A label-based trigger library for value switching, deferred calls, early returns, and rollback."
 readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.12"
 license = {file = "LICENSE"}
 keywords = [
-  "python", 
-  "triggon",
   "trigger",
-  "label-based",
-  "dynamic-switching", 
-  "delayed-execution",
-  "early-return", 
-  "runtime-control",
-  "lightweight",
+  "label-switching",
+  "value-switching",
+  "deferred-execution",
+  "early-return",
+  "rollback",
+  "conditional-execution",
+  "runtime-switching",
 ]
 classifiers = [
     "Programming Language :: Python :: 3.12",
@@ -47,6 +46,12 @@ Source = "https://github.com/tsuruko12/triggon"
 
 [tool.setuptools]
 include-package-data = true
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["triggon*"]
+namespaces = true
 
 [tool.setuptools.package-data]
 "triggon" = ["py.typed", "*.pyi"]
