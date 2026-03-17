@@ -3,6 +3,31 @@
 All notable changes to this project will be documented in this file.
 
 ---
+### [2.0.0] - 2026-03-18
+#### Breaking Changes
+- Replaced `switch_var()` with `register_ref()` and `register_refs()` for applying label-controlled values to variables and attributes
+- Replaced `exit_point()` with the `capture_return()` context manager, and updated `trigger_return()` to work only inside that context
+- Renamed `trigger_func()` to `trigger_call()`
+- `is_triggered()` and `is_registered()` now return a single `bool` and support `match_all` instead of returning per-item result sequences
+- Updated several API names and signatures for consistency, including `new` to `new_values` and `index` to `indices` where multiple labels are supported
+
+#### Added
+- New constructors: `from_label()` and `from_labels()`
+- New label registration APIs: `add_label()` and `add_labels()`
+- New reference management API: `unregister_refs()`
+- New context manager: `rollback()` for restoring temporary updates on exit
+- Support for `reschedule` in `set_trigger()` and `revert()`
+- Environment-variable-based debug configuration with `TRIGGON_LOG_VERBOSITY`, `TRIGGON_LOG_FILE`, and `TRIGGON_LOG_LABELS`
+- A comprehensive automated test suite
+
+#### Changed
+- Reorganized the package into a `src/` layout and split the implementation into clearer internal modules
+- Improved `TrigFunc` so deferred targets can be reused across scopes and passed more flexibly
+- Improved debug logging and deferred call handling with `TrigFunc`
+- When registering values, a non-string sequence can now be treated as a single value by wrapping it in any outer sequence, not just a list or tuple
+- Strengthened validation and error reporting across the API
+- Refreshed the README and API docstrings
+
 ### [1.0.1] - 2025-08-26
 ### Fixed
 - Raise error when switching values in `switch_var()`.
@@ -43,9 +68,6 @@ All notable changes to this project will be documented in this file.
 - Improved debug output
 - Strengthened error checking in all functions.
 
-### Refactored
-- Cleaned up code across multiple files
-
 ### Removed
 - `alter_literal()` and `alter_var()`
 - The `label` argument from `exit_point()`
@@ -57,9 +79,6 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - Supported empty sequences or dictionaries as new values
 - Labels and the `index` keyword now support variables and attribute chains
-
-### Refactored
-- Cleaned up code across multiple files
 
 ### Fixed
 - Fixed bugs related to `debug` mode usage
@@ -74,9 +93,6 @@ All notable changes to this project will be documented in this file.
 - `ret` keyword argument in `trigger_return()` for returning a value
 - Support for switching multiple values for a single variable
 - Support for multiple labels in `switch_lit()` (`alter_literal()`)
-
-### Refactored
-- Cleaned up code across multiple files
 
 ### Fixed
 - Bugs in variable registration function
