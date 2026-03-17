@@ -37,11 +37,10 @@ class LabelValidator:
 
         for i, label in enumerate(labels):
             _validate_label(label)
-
             if is_init:
                 continue
 
-            self.ensure_labels_exist(label, orig_labels[i])
+            self._ensure_labels_exist(label, orig_labels[i])
             self.validate_idx_range(label, idxs[i])
 
         return tuple(labels), tuple(idxs)
@@ -76,7 +75,7 @@ class LabelValidator:
 
         return stripped_labels, symbol_counts
 
-    def ensure_labels_exist(self, label: str, orig_label: str | None = None) -> None:
+    def _ensure_labels_exist(self, label: str, orig_label: str | None = None) -> None:
         if label not in self._new_values:
             raise UnregisteredLabelError(label, orig_label)
 
