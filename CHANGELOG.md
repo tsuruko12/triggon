@@ -24,6 +24,7 @@ All notable changes to this project will be documented in this file.
 - Reorganized the package into a `src/` layout and split the implementation into clearer internal modules
 - Improved `TrigFunc` so deferred targets can be reused across scopes and passed more flexibly
 - Improved debug logging and deferred call handling with `TrigFunc`
+- Improved debug log output for readability
 - When registering values, a non-string sequence can now be treated as a single value by wrapping it in any outer sequence, not just a list or tuple
 - Strengthened validation and error reporting across the API
 - Refreshed the README and API docstrings
