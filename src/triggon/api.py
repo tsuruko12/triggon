@@ -2,13 +2,9 @@ import logging
 import sys
 import threading
 from contextlib import contextmanager
+from collections.abc import Iterator, Mapping, Sequence, ValuesView
 from dataclasses import dataclass
-from typing import (
-    Any,
-    Mapping,
-    Self,
-    ValuesView,
-)
+from typing import Any, Self
 
 from ._internal import (
     _Internal,
@@ -72,7 +68,7 @@ class Triggon(_Core, _Internal):
     _label_is_active: dict[str, bool]
     _label_delay_state: dict[str, dict[DelayKey, DelayState]]
     _label_is_perm_disabled: dict[str, bool]
-    _new_values: Mapping[str, tuple[Any, ...]]
+    _new_values: dict[str, tuple[Any, ...]]
     _label_refs: dict[str, RefsByKind]
     _id_meta: dict[int, RefMeta]
     _latest_id: int
@@ -92,14 +88,13 @@ class Triggon(_Core, _Internal):
 
         Args:
             label (str | None):
-                A single label name to register. Use this form together with
-                `new_values`. Labels must not start with `*`.
+                A single label name to register. Labels must not start with `*`.
             new_values (Any):
                 The value associated with `label`. If omitted, `None` is used.
                 Non-string sequences are normalized into indexed values.
+                Wrap a sequence in another sequence to treat it as a single value.
             label_values (Mapping[str, Any] | None):
-                A mapping from label names to values. Use this instead of
-                `label` and `new_values` when registering multiple labels.
+                A mapping from label names to values used to register one or more labels.
             debug (bool | str | Sequence[str], optional):
                 Controls debug logging. If False, environment variables are not
                 used. If True, detailed settings can be configured with
@@ -111,6 +106,7 @@ class Triggon(_Core, _Internal):
                 If no labels are provided, or if `label_values` is combined
                 with `label` or `new_values`, or if any label starts with `*`.
         """
+
         if label_values is None:
             if label is None:
                 raise InvalidArgumentError("no labels specified")
@@ -140,6 +136,7 @@ class Triggon(_Core, _Internal):
             is_init=True,
         )
 
+        self._new_values = {}
         self._label_is_active = {}
         self._label_delay_state = {}
         self._label_is_perm_disabled = {}
@@ -160,15 +157,18 @@ class Triggon(_Core, _Internal):
         label_values = {}
 
         for label, val in zip(labels, values):
+            if label in self._new_values:
+                continue
             self._add_new_labels(label)
 
-            if isinstance(val, (list, tuple)):
+            if isinstance(val, Sequence) and not isinstance(val, (str, bytes, bytearray)):
                 if len(val) >= 1:
                     label_values[label] = tuple(val)
                     continue
+
             label_values[label] = (val,)
 
-        self._new_values = label_values
+        self._new_values.update(label_values)
 
     def _add_new_labels(self, label: str) -> None:
         self._label_is_active[label] = False
@@ -195,7 +195,8 @@ class Triggon(_Core, _Internal):
                 The label name to register. Labels must not start with `*`.
             new_values (Any):
                 The value associated with `label`. Non-string sequences are
-                treated as indexed values.
+                treated as indexed values. Wrap a sequence in another sequence to
+                treat it as a single value.
             debug (bool | str | Sequence[str], optional):
                 Controls debug logging. If False, environment variables are not
                 used. If True, detailed settings can be configured with
@@ -220,14 +221,14 @@ class Triggon(_Core, _Internal):
         *,
         debug: DebugArg = False,
     ) -> Self:
-        """Create an instance from multiple labels.
+        """Create an instance from one or more labels.
 
         Args:
             label_values (Mapping[str, Any]):
                 A mapping from label names to their associated values. If a
                 value is a non-string sequence, each element becomes an indexed
                 value for that label. Wrap a sequence in another sequence to
-                keep it as a single value. Mapping keys must not start with `*`.
+                treat it as a single value. Mapping keys must not start with `*`.
             debug (bool | str | Sequence[str], optional):
                 Controls debug logging. If False, environment variables are not
                 used. If True, detailed settings can be configured with
@@ -244,6 +245,56 @@ class Triggon(_Core, _Internal):
 
         return cls(label_values=label_values, debug=debug)
 
+    def add_label(self, label: str, /, new_values: Any = None) -> None:
+        """Register one additional label.
+
+        If `label` is already registered, this method does nothing and keeps
+        the existing values and state for that label.
+
+        Args:
+            label (str):
+                The label name to add. Labels must not start with `*`.
+            new_values (Any, optional):
+                The value associated with `label`. If omitted, `None` is used.
+                Non-string sequences are treated as indexed values.
+                Wrap a sequence in another sequence to treat it as a single value.
+
+        Raises:
+            InvalidArgumentError:
+                If `label` is invalid, including when it starts with `*`.
+        """
+
+        check_str_sequence(arg_name="label", args=label, allow_multi=False)
+        label_tup, _ = self.resolve_labels_and_idxs(
+            label, idxs=None, allow_symbol=False, is_init=True
+        )
+        self._normalize_label_values(label_tup, (new_values,))
+
+    def add_labels(self, label_values: Mapping[str, Any], /) -> None:
+        """Register additional labels from a mapping.
+
+        Labels that are already registered are ignored and keep their existing
+        values and state.
+
+        Args:
+            label_values (Mapping[str, Any]):
+                A mapping from label names to their associated values. If a
+                value is a non-string sequence, each element becomes an indexed
+                value for that label. Wrap a sequence in another sequence to
+                treat it as a single value. Mapping keys must not start with `*`.
+
+        Raises:
+            InvalidArgumentError:
+                If `label_values` is empty or includes an invalid label,
+                including when any label starts with `*`.
+        """
+
+        check_items(arg_name="label_values", arg=label_values)
+        labels, _ = self.resolve_labels_and_idxs(
+            label_values.keys(), idxs=None, allow_symbol=False, is_init=True
+        )
+        self._normalize_label_values(labels, label_values.values())
+
     def set_trigger(
         self,
         labels: LabelArg | None = None,
@@ -257,23 +308,24 @@ class Triggon(_Core, _Internal):
     ) -> None:
         """Activate labels.
 
-        If an applied value is a deferred `TrigFunc` instance, it is executed
-        at update time and its result is used.
+        If an applied value is deferred by `TrigFunc`, it is executed
+        during the update, and its result is used.
 
         Args:
             labels (str | Sequence[str], optional):
                 The labels to activate. Ignored when `all` is True. If a label starts
-                with `*`, the number of leading `*` characters is treated as
-                its index.
+                with `*`, the number of leading `*` characters is treated as its index.
             indices (int | Sequence[int], optional):
-                Indices to use for each label. When provided, the number of
-                indices must match the number of labels. These explicit values
-                take precedence over any `*` prefix in `labels`.
+                The indices of the values to use for each label. Each index
+                selects which indexed value of the corresponding label is used.
+                When provided, the number of indices must match the number of
+                labels. These explicit values take precedence over any `*`
+                prefix in `labels`.
             all (bool, optional):
                 If True, activate all registered labels.
             cond (str, optional):
-                A boolean expression that must evaluate to True before the
-                labels are activated. The expression is evaluated at call time.
+                An expression that is evaluated at call time. The labels are
+                activated only if it evaluates to True.
             after (int | float, optional):
                 Delay in seconds before the labels become active. Even when a
                 smaller value is given, the actual delay is about 0.011
@@ -285,7 +337,8 @@ class Triggon(_Core, _Internal):
         Raises:
             InvalidArgumentError:
                 If no labels are specified when `all` is False, or if any
-                argument is invalid.
+                argument is invalid, or if `cond` uses an unsupported
+                expression.
             IndexError:
                 If any resolved index is out of range for its label.
             NameError:
@@ -357,8 +410,8 @@ class Triggon(_Core, _Internal):
     ) -> Any:
         """Return the active label value or the original value.
 
-        If an applied value is a deferred `TrigFunc` instance, it is
-        executed and its result is returned.
+        If an applied value is deferred by `TrigFunc`, it is executed
+        and its result is returned.
 
         Args:
             labels (str | Sequence[str]):
@@ -369,9 +422,11 @@ class Triggon(_Core, _Internal):
             original_val (Any):
                 The value to return when none of the labels is active.
             indices (int | Sequence[int], optional):
-                Indices to use for each label. When provided, the number of
-                indices must match the number of labels. These explicit values
-                take precedence over any `*` prefix in `labels`.
+                The indices of the values to use for each label. Each index
+                selects which indexed value of the corresponding label is used.
+                When provided, the number of indices must match the number of
+                labels. These explicit values take precedence over any `*`
+                prefix in `labels`.
 
         Returns:
             Any: The switched value if a label is active, otherwise
@@ -428,8 +483,8 @@ class Triggon(_Core, _Internal):
         """Register a variable or attribute for a label.
 
         If the label is already active when the target is registered, the
-        target is updated immediately. If the applied value is a deferred
-        `TrigFunc` instance, it is executed and its result is used.
+        target is updated immediately. If the applied value is deferred by
+        `TrigFunc`, it is executed and its result is used.
 
         Args:
             label (str):
@@ -440,7 +495,8 @@ class Triggon(_Core, _Internal):
                 The target name to register. This may be a variable name or an
                 attribute path.
             index (int | None, optional):
-                The index of the value to use from the given label when the target is
+                The index of the value to use from the given label. This
+                selects which indexed value is applied if the target is
                 registered while the label is already active.
 
         Raises:
@@ -468,15 +524,15 @@ class Triggon(_Core, _Internal):
         """Register multiple variables or attributes at once.
 
         If a label is already active when a target is registered, the target is
-        updated immediately. If the applied value is a deferred `TrigFunc`
-        instance, it is executed and its result is used.
+        updated immediately. If the applied value is deferred by `TrigFunc`,
+        it is executed and its result is used.
 
         Args:
             label_to_refs (Mapping[str, Mapping[str, int]]):
                 A mapping from labels to target names and the index of the
                 value to use if the label is already active when the target is
                 registered. Each target name may be a variable name or an
-                attribute path. Label must not start with `*`.
+                attribute path. Labels must not start with `*`.
 
         Raises:
             InvalidArgumentError:
@@ -574,7 +630,7 @@ class Triggon(_Core, _Internal):
                 return True
         return False
 
-    def unregister_refs(self, names: NameArg, labels: LabelArg | None = None) -> None:
+    def unregister_refs(self, names: NameArg, /, *, labels: LabelArg | None = None) -> None:
         """Unregister variable or attribute names from labels.
 
         When `labels` is omitted, the given names are removed from all
@@ -632,18 +688,16 @@ class Triggon(_Core, _Internal):
 
         Args:
             labels (str | Sequence[str] | None):
-                The labels to deactivate. Ignored when `all` is True. If a
-                label starts with `*`, the number of leading `*` characters is
-                treated as its index.
+                The labels to deactivate. Ignored when `all` is True.
+                Labels must not start with `*`.
             all (bool, optional):
                 If True, deactivate all registered labels.
             disable (bool, optional):
                 If True, permanently disable the target labels so later
                 `set_trigger()` calls do not activate them.
             cond (str, optional):
-                A boolean expression that must evaluate to True before the
-                labels are deactivated. The expression is evaluated at call
-                time.
+                An expression that is evaluated at call time. The labels are
+                deactivated only if it evaluates to True.
             after (int | float, optional):
                 Delay in seconds before the labels are deactivated. Even when a
                 smaller value is given, the actual delay is about 0.011
@@ -655,9 +709,8 @@ class Triggon(_Core, _Internal):
         Raises:
             InvalidArgumentError:
                 If no labels are specified when `all` is False, or if any
-                argument is invalid.
-            IndexError:
-                If any resolved index from prefixed labels is out of range for its label.
+                argument is invalid, or if `cond` uses an unsupported
+                expression.
             NameError:
                 If `cond` refers to a name that does not exist.
             AttributeError:
@@ -671,7 +724,7 @@ class Triggon(_Core, _Internal):
                 raise InvalidArgumentError("no labels specified")
 
             check_str_sequence(arg_name="labels", args=labels)
-            labels_iter, _ = self.resolve_labels_and_idxs(labels, idxs=None)
+            labels_iter, _ = self.resolve_labels_and_idxs(labels, idxs=None, allow_symbol=False)
         else:
             labels_iter = self._new_values.keys()
 
@@ -693,7 +746,7 @@ class Triggon(_Core, _Internal):
 
     @staticmethod
     @contextmanager
-    def rollback(targets: NameArg | None = None) -> Any:
+    def rollback(targets: NameArg | None = None) -> Iterator[None]:
         """Temporarily mutate names and restore their original values on exit.
 
         The original values are restored when leaving the context, even if an
@@ -704,17 +757,16 @@ class Triggon(_Core, _Internal):
                 Names to restore when leaving the context. Each name may be a
                 variable name or an attribute path such as `obj.value`. If
                 omitted, assignment targets inside the `with` block are
-                collected automatically. Names that cannot be resolved are
-                ignored.
-
-        Yields:
-            None: A context in which target values may be changed temporarily.
+                collected automatically. Undefined names and unsupported
+                targets are ignored.
 
         Raises:
             RollbackNotSupportedError:
                 If the current runtime is earlier than CPython 3.13.
-            TypeError:
-                If `targets` is not a string or a sequence of strings.
+            InvalidArgumentError:
+                If `targets` is empty.
+            AttributeError:
+                If a given attribute path cannot be resolved.
             UpdateError:
                 If a target cannot be restored when exiting the context.
         """
@@ -737,13 +789,13 @@ class Triggon(_Core, _Internal):
             revert_targets(frame, name_to_refs)
 
     @contextmanager
-    def capture_return(self) -> Any:
+    def capture_return(self) -> Iterator[EarlyReturnResult]:
         """Capture an early return triggered by `trigger_return()`.
 
         `trigger_return()` is active only inside this context. If it is
         triggered, the yielded result object is updated with `triggered=True`
-        and the captured value. If the captured value is a deferred `TrigFunc`
-        instance, it is executed and its result is stored.
+        and the captured value. If the captured value is deferred by
+        `TrigFunc`, it is executed and its result is stored.
 
         Yields:
             EarlyReturnResult: The result object for the captured return.
@@ -771,9 +823,8 @@ class Triggon(_Core, _Internal):
         labels: LabelArg,
         /,
         *,
-        indices: IndexArg | None = None,
         value: Any = None,
-    ) -> Any:
+    ) -> None:
         """Trigger an early return when one of the labels is active.
 
         This method is available only inside `capture_return()`. If no given
@@ -783,25 +834,17 @@ class Triggon(_Core, _Internal):
             labels (str | Sequence[str]):
                 Labels to check for the early return. Labels must not start
                 with `*`.
-            indices (int | Sequence[int] | None, optional):
-                Explicit indices for the given labels. When provided, the
-                number of indices must match the number of labels.
             value (Any, optional):
-                The value to capture when an active label is found and
-                `indices` is not provided. If the captured value is a deferred
-                `TrigFunc` instance, it is executed by `capture_return()`.
-
-        Returns:
-            None: Returns `None` when no given label is active.
+                The value to capture when an active label is found.
+                If the captured value is deferred by `TrigFunc`, it is
+                executed by `capture_return()`.
 
         Raises:
             InactiveCaptureError:
                 If `capture_return()` is not active.
             InvalidArgumentError:
-                If `labels` or `indices` are invalid, or if any label starts
+                If `labels` is invalid, or if any label starts
                 with `*`.
-            IndexError:
-                If any given index is out of range for its label.
             UnregisteredLabelError:
                 If any given label is not registered.
         """
@@ -810,33 +853,25 @@ class Triggon(_Core, _Internal):
             raise InactiveCaptureError()
 
         check_str_sequence("labels", labels)
-        check_idxs(indices)
 
-        labels, idxs = self.resolve_labels_and_idxs(labels, indices, allow_symbol=False)
+        labels, _ = self.resolve_labels_and_idxs(labels, idxs=None, allow_symbol=False)
 
         target_label = None
-        target_idx = None
 
-        for i, label in enumerate(labels):
+        for label in labels:
             if self._label_is_active[label]:
                 target_label = label
-                if indices is not None:
-                    target_idx = idxs[i]
                 break
 
         if target_label is None:
             return
-        if target_idx is None:
-            return_val = value
-        else:
-            return_val = self._new_values[target_label][target_idx]
 
-        self._return_val_stack[-1] = return_val
+        self._return_val_stack[-1] = value
 
         if self.debug[LOG_VERBOSITY] != 0:
             frame = get_target_frame()
             callsite = get_callsite(frame)
-            self.log_early_return(target_label, return_val, callsite)
+            self.log_early_return(target_label, value, callsite)
 
         raise _EarlyReturn
 
@@ -846,23 +881,24 @@ class Triggon(_Core, _Internal):
         /,
         target: TrigFunc,
     ) -> Any:
-        """Run a deferred `TrigFunc` when one of the labels is active.
+        """Run a target deferred by `TrigFunc` when one of the labels is active.
 
         Args:
             labels (str | Sequence[str]):
                 Labels to check before running `target`. Labels must not start
                 with `*`.
             target (TrigFunc):
-                A deferred `TrigFunc` instance to run.
+                A target deferred by `TrigFunc` to run.
 
         Returns:
-            Any: The result of `target._run()` if one of the labels is active.
-            Returns `None` when no given label is active.
+            Any | None:
+                The result of `target._run()` if any of the given labels is active;
+                otherwise, `None`.
 
         Raises:
             TypeError:
-                If `target` is not a deferred `TrigFunc` instance, or if it
-                does not satisfy the call requirements for this method.
+                If `target` is not deferred by `TrigFunc`, or if it does not
+                satisfy the call requirements for this method.
             InvalidArgumentError:
                 If `labels` is invalid or any label starts with `*`.
             UnregisteredLabelError:
@@ -870,7 +906,7 @@ class Triggon(_Core, _Internal):
         """
 
         if not hasattr(target, TRIGFUNC_ATTR):
-            raise TypeError("target must be deferred using a TrigFunc instance")
+            raise TypeError("target must be deferred by TrigFunc")
 
         check_str_sequence(arg_name="labels", args=labels)
         labels, _ = self.resolve_labels_and_idxs(labels, idxs=None, allow_symbol=False)
