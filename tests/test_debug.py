@@ -170,6 +170,45 @@ def test_level_3_logs_unregister(monkeypatch, capsys):
     assert "'debug_registered_value' was unregistered from label 'A'" in err
 
 
+def test_level_3_logs_added_label(monkeypatch, capsys):
+    monkeypatch.setenv("TRIGGON_LOG_VERBOSITY", "3")
+    tg = Triggon.from_label("A", new_values=10, debug=True)
+
+    def action():
+        tg.add_label("B", 20)
+
+    err = _capture_debug_stderr(tg, capsys, action)
+
+    assert "Label B was added" in err
+
+
+def test_level_3_logs_only_new_labels_from_add_labels(monkeypatch, capsys):
+    monkeypatch.setenv("TRIGGON_LOG_VERBOSITY", "3")
+    tg = Triggon.from_labels({"A": 10}, debug=True)
+
+    def action():
+        tg.add_labels({"A": 11, "B": 20, "C": 30})
+
+    err = _capture_debug_stderr(tg, capsys, action)
+
+    assert "Label A was added" not in err
+    assert "Label B was added" in err
+    assert "Label C was added" in err
+
+
+def test_level_3_filters_added_label_logs(monkeypatch, capsys):
+    monkeypatch.setenv("TRIGGON_LOG_VERBOSITY", "3")
+    tg = Triggon.from_label("A", new_values=10, debug="C")
+
+    def action():
+        tg.add_labels({"B": 20, "C": 30})
+
+    err = _capture_debug_stderr(tg, capsys, action)
+
+    assert "Label B was added" not in err
+    assert "Label C was added" in err
+
+
 def test_level_3_logs_delayed_trigger(monkeypatch, capsys):
     monkeypatch.setenv("TRIGGON_LOG_VERBOSITY", "3")
     tg = Triggon.from_label("A", new_values=10, debug=True)
@@ -256,7 +295,7 @@ def test_env_label_filter(monkeypatch, capsys):
     assert "Label 'A' is active" not in err
 
 
-def test_invalid_label_filter_warns(monkeypatch, capsys):
+def test_invalid_label_filter_keeps_unregistered_labels_without_warning(monkeypatch, capsys):
     monkeypatch.setenv("TRIGGON_LOG_VERBOSITY", "1")
     monkeypatch.setenv("TRIGGON_LOG_LABELS", "missing, B")
     tg = Triggon.from_labels({"A": 10, "B": 20}, debug=True)
@@ -266,7 +305,7 @@ def test_invalid_label_filter_warns(monkeypatch, capsys):
 
     err = _capture_debug_stderr(tg, capsys, action, clear_before=False)
 
-    assert "label 'missing' is not registered" in err
+    assert "label 'missing' is not registered" not in err
 
 
 def test_invalid_label_filter_keeps_valid_labels(monkeypatch, capsys):
