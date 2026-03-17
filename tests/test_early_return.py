@@ -66,41 +66,27 @@ def test_returns_none_when_inactive():
     assert result.value is None
 
 
-def test_uses_indexed_label_value():
+def test_triggers_for_active_indexed_label():
     tg = Triggon.from_label("A", new_values=(10, 20, 30))
 
     def run():
         tg.set_trigger("A", indices=2)
-        tg.trigger_return("A", indices=2, value=999)
+        tg.trigger_return("A", value=999)
 
     with tg.capture_return() as result:
         run()
 
     assert result.triggered is True
-    assert result.value == 30
+    assert result.value == 999
 
 
-def test_uses_first_active_idx():
-    tg = Triggon.from_labels({"A": (10, 11), "B": (20, 21), "C": (30, 31)})
-
-    def run():
-        tg.set_trigger(("B", "C"))
-        tg.trigger_return(("A", "B", "C"), indices=(0, 1, 0), value=999)
-
-    with tg.capture_return() as result:
-        run()
-
-    assert result.triggered is True
-    assert result.value == 21
-
-
-def test_runs_deferred_label_value():
+def test_runs_deferred_explicit_value():
     f = TrigFunc()
-    tg = Triggon.from_label("A", new_values=f.len("abcd"))
+    tg = Triggon.from_label("A", new_values=1)
 
     def run():
         tg.set_trigger("A")
-        tg.trigger_return("A", indices=0)
+        tg.trigger_return("A", value=f.len("abcd"))
 
     with tg.capture_return() as result:
         run()
@@ -200,7 +186,6 @@ def test_nested_restores_outer_ctx():
     "call",
     [
         lambda tg: tg.trigger_return(1, value=10),
-        lambda tg: tg.trigger_return("A", indices="bad", value=10),
     ],
 )
 def test_rejects_invalid_arg_types(call):
@@ -209,32 +194,6 @@ def test_rejects_invalid_arg_types(call):
     with tg.capture_return():
         with pytest.raises(TypeError):
             call(tg)
-
-
-def test_rejects_negative_idxs():
-    tg = Triggon.from_label("A", new_values=(10, 20))
-
-    with tg.capture_return():
-        with pytest.raises(InvalidArgumentError, match="must be non-negative"):
-            tg.trigger_return("A", indices=-1, value=10)
-
-
-@pytest.mark.parametrize("indices", [(0,), (0, 1, 0)])
-def test_rejects_idxs_length_mismatch(indices):
-    tg = Triggon.from_labels({"A": (10, 20), "B": (30, 40)})
-
-    with tg.capture_return():
-        with pytest.raises(InvalidArgumentError, match="same length"):
-            tg.trigger_return(("A", "B"), indices=indices, value=10)
-
-
-def test_rejects_out_of_range_idx():
-    tg = Triggon.from_label("A", new_values=(10, 20))
-
-    with tg.capture_return():
-        with pytest.raises(IndexError, match=r"index 5 is out of range for label 'A'"):
-            tg.trigger_return("A", indices=5, value=10)
-
 
 def test_rejects_symbol_labels():
     tg = Triggon.from_label("A", new_values=1)
