@@ -70,6 +70,25 @@ def test_cond_controls_revert():
     assert tg.is_triggered("A") is False
 
 
+def test_cond_accepts_top_level_subscript_access():
+    tg = Triggon.from_label("A", new_values=1)
+    config = {"feature": {"enabled": True}}
+
+    tg.set_trigger("A", cond='config["feature"]["enabled"]')
+
+    assert tg.is_triggered("A") is True
+
+
+def test_cond_accepts_top_level_subscript_access_for_revert():
+    tg = Triggon.from_label("A", new_values=1)
+    config = {"feature": {"enabled": True}}
+
+    tg.set_trigger("A")
+    tg.revert("A", cond='config["feature"]["enabled"]')
+
+    assert tg.is_triggered("A") is False
+
+
 def test_set_trigger_all_activates_all_labels():
     tg = Triggon.from_labels({"A": 1, "B": 2, "C": 3})
 
@@ -273,7 +292,7 @@ def test_cond_raises_for_invalid_allowed_calls(action):
 @pytest.mark.parametrize(
     ("expr", "match"),
     [
-        ("x = 1", "cond: only expressions are allowed"),
+        ("x = 1", "cond: expected an expression"),
         ("len(text)", "cond: expression must evaluate to bool"),
         ("maker().value == 1", "cond: invalid attribute access"),
         ("text.lower() == 'a'", "cond: method 'lower' is not allowed"),

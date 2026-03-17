@@ -38,7 +38,7 @@ def test_accepts_multiple_labels():
 def test_rejects_non_trigfunc_target():
     tg = Triggon.from_label("A", new_values=1)
 
-    with pytest.raises(TypeError, match="deferred using a TrigFunc instance"):
+    with pytest.raises(TypeError, match="deferred by TrigFunc"):
         tg.trigger_call("A", 123)
 
 

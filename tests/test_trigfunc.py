@@ -39,7 +39,7 @@ def test_clones_remain_independent():
 def test_runs_glob_callable_with_kwargs():
     f = TrigFunc()
 
-    assert f.global_trigfunc_target("(", suffix=")")._run() == "(global)"
+    assert f.glob_trigfunc_target("(", suffix=")")._run() == "(global)"
 
 
 def test_runs_loc_method_chain():
