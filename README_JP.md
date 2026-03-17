@@ -1,784 +1,575 @@
 # triggon
+
 [![PyPI](https://img.shields.io/pypi/v/triggon)](https://pypi.org/project/triggon/)
 ![Python](https://img.shields.io/pypi/pyversions/triggon)
 ![Python](https://img.shields.io/pypi/l/triggon)
-![Package Size](https://img.shields.io/badge/size-31kB-lightgrey)
+![Package Size](https://img.shields.io/badge/size-35.3kB-lightgrey)
 [![Downloads](https://pepy.tech/badge/triggon)](https://pepy.tech/project/triggon)
 
-> **警告**:  
-> 次回のアップデートでは破壊的変更を含む予定です。  
-> 一部APIの仕様を変更し、`switch_var`・`exit_point`・`trigger_func` のAPI名も変更予定です。
+## 概要
 
-# 概要
-このライブラリはラベル付きトリガーポイントで値や関数を動的に切り替えることができます。 
+Triggon は、繰り返しがちな条件分岐や一時的な状態変更の定型コードを減らすための Python ライブラリです。ラベルによる値の切り替え、遅延呼び出し、一時的な変更の復元、設定した戻り値を伴う早期終了をまとめて扱えます。分岐ロジックを 1 か所から書きやすく、再利用しやすく、制御しやすくすることが目的です。
 
 ## 目次
-- [インストール方法](#インストール方法)
-- [使い方](#使い方)
-- [ライセンス](#ライセンス)
-- [開発者](#開発者)
+
+- [インストール](#%E3%82%A4%E3%83%B3%E3%82%B9%E3%83%88%E3%83%BC%E3%83%AB)
+- [クイックスタート](#%E3%82%AF%E3%82%A4%E3%83%83%E3%82%AF%E3%82%B9%E3%82%BF%E3%83%BC%E3%83%88)
+- [API リファレンス](#api-%E3%83%AA%E3%83%95%E3%82%A1%E3%83%AC%E3%83%B3%E3%82%B9)
+  - [Triggon](#triggon)
+  - [TrigFunc](#trigfunc)
+  - [デバッグログ](#%E3%83%87%E3%83%90%E3%83%83%E3%82%B0%E3%83%AD%E3%82%B0)
+  - [例外](#%E4%BE%8B%E5%A4%96)
+- [ライセンス](#%E3%83%A9%E3%82%A4%E3%82%BB%E3%83%B3%E3%82%B9)
+- [作者](#%E4%BD%9C%E8%80%85)
 
 ## 特徴
-- １つのトリガーポイントで複数の値や関数を一度に切り替え
-- `if` や `match` 文を書く必要なし 
-- リテラル値・変数の両方の切り替え可能
-- 任意の戻り値で早期リターンが可能
-- 関数を好きなタイミングで呼び出し可能  
-- ほとんどのライブラリ関数やカスタム関数を遅延実行できる  
 
-## 追加予定機能
-- 環境変数で設定できるデバッグ設定を追加（verbosity、ファイル出力、対象ラベル）
-- ラベルと値の登録処理を、単一ラベル用・複数ラベル用の2つのクラスメソッドに分割
-- 遅延実行クラスで、関数やクラスメソッドをより柔軟な方法で渡せるように対応
-- すでにスケジュール済みの遅延トリガーを上書きできる `reschedule` オプションの追加
-- `is_triggered` と `is_registered` に `match_all` オプションを追加
-- 一時的な変更を元に戻すためのコンテキストマネージャの追加
+- `if` 文を書かずに、複数の値を一度に切り替え、登録した変数や属性もまとめて更新できます。
+- `TrigFunc` によって遅延された関数やメソッドを実行できます。
+- コンテキストマネージャ内で、設定した戻り値を指定して早期リターンできます。
+- 条件や遅延を指定して、trigger / revert 操作をスケジュールできます。
+- コンテキストマネージャを使って、一時的な変更を元に戻せます。
 
-## インストール方法
+## インストール
+
 ```bash
 pip install triggon
 ```
 
-## 使い方
-このセクションでは、API の使い方を説明します。
+## クイックスタート
 
-## API Reference
-- [Triggon](#triggon)
-  - [set_trigger](#set_trigger)
-  - [is_triggered](#is_triggered)
-  - [switch_lit](#switch_lit)
-  - [switch_var](#switch_var)
-  - [is_registered](#is_registered)
-  - [revert](#revert)
-  - [exit_point](#exit_point)
-  - [trigger_return](#trigger_return)
-  - [trigger_func](#trigger_func)
-- [TrigFunc](#trigfunc)
-- [Erorr](#error)
-  - [InvalidArgumentError](#invalidargumenterror)
-  - [InvalidClassVarError](#invalidclassvarerror)
-  - [MissingLabelError](#missinglabelerror)
+```python
+from triggon import Triggon
+
+tg = Triggon.from_labels(
+    {
+        "prod": "https://api.example.com",
+        "dev": "http://localhost:8000",
+    }
+)
+
+
+def get_base_url() -> str:
+    return tg.switch_lit(("prod", "dev"), original_val="http://127.0.0.1:5000")
+
+
+print(get_base_url())
+# http://127.0.0.1:5000
+
+tg.set_trigger("dev")
+print(get_base_url())
+# http://localhost:8000
+```
+
+## API リファレンス
 
 ### Triggon
-`self, label: str | dict[str, Any], /, new: Any = None,`  
-`*, debug: bool | str | list[str] | tuple[str, ...] = False`
 
-`Triggon()` はラベルと値のペアで初期化されます。  
-単一のラベルとその値、または辞書で複数のラベルを渡すことが可能です。
+推奨される生成方法は次の 2 つです。
 
-配列を使って1つのラベルに複数の値を渡した場合、  
-それぞれの値は、指定した順にインデックス 0、1、2... に対応します。
+```python
+Triggon.from_label(label, /, new_values, *, debug=False) -> Triggon
+Triggon.from_labels(label_values, /, *, debug=False) -> Triggon
+```
+
+`from_label()` は単一ラベルとその値を登録します。\
+`from_labels()` はマッピングからラベルを登録でき、複数ラベルも一度に登録できます。
+
+必要に応じて `Triggon(...)` で直接生成することもできます。
+
+補足:
+
+- ラベル値として渡した文字列以外のシーケンスは、そのラベルのインデックス付き値として展開されます
+- 文字列以外のシーケンスを 1 つの値として扱いたい場合は、外側をさらにシーケンスで包んでください
+- `set_trigger()`、`revert()`、`switch_lit()`、`register_ref()` などでは、ラベルの先頭に `*` を付けてインデックスを簡易的に指定できます。たとえば `*A` はラベル `A` の index `1`、`**A` は index `2` を意味します
+- `debug` には `False`、`True`、単一のラベル名、またはログ出力対象のラベル名シーケンスを渡せます
 
 ```python
 from triggon import Triggon
 
-# インデックス1に100、インデックス2に0を変更値として設定
-tg = Triggon("num", new=[100, 0])
+tg = Triggon.from_label("A", new_values=[1, 2, 3]) # 1つのラベルに複数のインデックス値を登録
 
-def example():
-    x = tg.switch_lit("num", 0)    # インデック 0
-    y = tg.switch_lit("*num", 100) # インデック 1
-
-    print(f"{x} -> {y}")
-
-example()
-# 出力: 0 -> 100
-
-tg.set_trigger("num")
-
-example()
-# 出力: 100 -> 0
+tg = Triggon.from_labels(
+    {
+        "A": 10,
+        "B": 20,
+    }
+)
 ```
 
-１つの値としてリストやタプルを渡したい場合は、  
-１つの値として認識できるように、さらに別のリストやタプルで包んでください。
+#### `add_label()` / `add_labels()`
+
+`add_label()` は、1つのラベルとその値を追加します
+
+`add_labels()` は、マッピングを使って1つ以上のラベルとその値を追加します。
 
 ```python
-tg = Triggon({
-    "seq1": [(1, 2, 3)], # インデックス0に (1, 2, 3)
-    "seq2": [1, 2, 3],   # インデックス0, 1, 2に1, 2, 3を設定
-})
-
-def example():
-    x = tg.switch_lit("seq1", 10) # インデック 0
-    y = tg.switch_lit("seq2", 10) # インデック 0
-
-    print(f"seq1 の値: {x}")
-    print(f"seq1 の値: {y}")
-
-tg.set_trigger(("seq1", "seq2"))
-
-example()
-# == 出力 ==
-# seq1 の値: (1, 2, 3)
-# seq2 の値: 1
+add_label(label, new_values=None) -> None
+add_labels(label_values) -> None
 ```
 
-１つのインデックスに対して、複数の値を割り当てることも可能です。
+すでに登録済みのラベルは無視されます。
+
+#### `set_trigger()`
+
+1 つ以上のラベルを有効化します。ラベルに紐付いた登録対象があれば、その値も同時に更新されます。
 
 ```python
-from dataclasses import dataclass
-
-from triggon import Triggon
-
-tg = Triggon("mode", new=True) # "mode"ラベルのインデックス0にTrueを設定
-
-@dataclass
-class ModeFlags:
-    mode_a: bool = False
-    mode_b: bool = False
-    mode_c: bool = False
-
-    def set_mode(self, enable: bool):
-        tg.set_trigger("mode", cond="enable")
-
-        tg.switch_var("mode", [self.mode_a, self.mode_b, self.mode_c]) # すべて同じインデックス0を共有
-
-        print(
-            f"mode_a is {self.mode_a}\n"
-            f"mode_b is {self.mode_b}\n"
-            f"mode_c is {self.mode_c}\n"
-        )
-
-s = ModeFlags()
-
-s.set_mode(Fa式se)
-# == 出力 ==
-# mode_a is False
-# mode_b is False
-# mode_c is False
-
-s.set_mode(True)
-# == 出力 ==
-# mode_a is True
-# mode_b is True
-# mode_c is True
+set_trigger(
+    labels=None,
+    /,
+    *,
+    indices=None,
+    all=False,
+    cond="",
+    after=0,
+    reschedule=False,
+) -> None
 ```
 
-ラベルの状態をリアルタイムで追跡したい場合は、`debug` フラグを `True` を指定してください。　 
-デバッグ出力したいラベルを単体、またはそれを含めたタプル/リストで渡すことで、  
-出力をソートすることができます。
+`labels` には、単一のラベルまたはラベルのシーケンスを渡せます。
 
-```python
-Triggon({"A": 10, "B": 20}, debug=True)       # "A"と"B"両方出力
+`indices` には、単一のインデックスまたはインデックスのシーケンスを渡せます。
 
-Triggon({"A": 10, "B": 20}, debug="A")        # "A"のみ出力
+適用される値が遅延済みの `TrigFunc` であれば、自動実行された結果が更新値として使われます。
 
-Triggon({"A": 10, "B": 20}, debug=("A", "B")) # 出力なし
-```
+`*` が付いたラベルでは、先頭の `*` の数がインデックスとして扱われます。\
+ただし、明示的に指定した `indices` がある場合は、そちらが優先されます。
 
-> ⚠️ **Note:** 
-> `*` プレフィックス付きのラベルは初期化時には使用できず、`InvalidArgumentError` が発生します。　
+キーワード引数:
 
----
-
-### set_trigger
-`self, label: str | list[str] | tuple[str, ...], /,`  
-`*,`  
-`all: bool = False,`  
-`index: int = None,`  
-`cond: str = None,`  
-`after: int | float = None`  
-`-> None`
-
-指定されたラベルを有効化します。
-`switch_var()` によって変数が登録済みの場合は、この関数内で変数値を切り替えます。
-
-`revert()` で `disable=True` に設定されてる場合、そのラベルは有効化されません。
-
-#### ***all***
-`True` に設定すると、すべてのラベルを有効にします。
-
-#### ***index***
-値を切り替える際のラベルのインデックス値を指定します。  
-指定されてない場合は、`switch_var()` で指定されたインデックスが使用されます。  
-
-これは `switch_var()` にのみ適用され、`switch_lit()` には適用されません。
-
-#### ***cond***
-ラベルを有効にする条件を設定します。
-
-> **⚠️ Note:**  
-> この引数の処理には内部的に `eval()` を使用します。  
-> **比較式のみ許可**されています（例: `x > 0 > y`, `value == 10`）。  
-> 単体のリテラル値、または変数が渡された場合、  
-> 値が `ブール値` 以外の時 `InvalidArgumentError` が発生します。  
-> 関数呼び出しの場合も同様です。
-
-#### ***after***
-ラベルを有効化するまでの遅延時間を秒数で指定します。  
-遅延中に再度指定された場合は上書きされずに、最初の秒数が維持されます。
-
-> **⚠️ Note:**  
-> 実際の実行は、指定した時間より **およそ 0.011 秒後** に行われます。
-
-```python
-import random
-
-from triggon import Triggon
-
-tg = Triggon({
-    "timeout": None, 
-    "mark": ("〇", "✖"), 
-    "add": (1, 0),
-})
-
-mark = None
-point = None
-correct = 0
-tg.switch_var({"mark": mark, "add": point}) # 変数を登録
-
-print("10秒間で何問正解できる？")
-tg.set_trigger("timeout", after=10) # 10秒後にラベル"timeout"を有効にする
-
-for _ in range(15):
-    x = random.randint(1, 10)
-    y = random.randint(1, 10)
-
-    answer = int(input(f"{x} × {y} = ") or 0)
-    tg.set_trigger(("mark", "add"), cond="answer == x*y")          # "mark" -> "〇", "add" -> 1
-    tg.set_trigger(("mark", "add"), index=1, cond="answer != x*y") # "mark" -> "✖", "add" -> 0
-    print(mark)
-
-    correct += point
-
-    if tg.is_triggered("timeout"): # ラベル"timeout"が有効にされてるか確認
-        print("タイムアップ！")
-        print(f"{correct}問正解！")
-        break
-```
-
-```python
-tg = Triggon("msg", new="呼びましたか？")
-
-def sample(print_msg: bool):
-    # print_msgがTrueの場合に"msg"のフラグを有効にする
-    tg.set_trigger("msg", cond="print_msg")
-
-    # "msg"フラグが有効な場合、テキストを出力する
-    print(tg.switch_lit("msg", ""))
-
-sample(False) # Output: ""
-sample(True)  # Output: 呼びましたか？ 
-```
-
----
-
-### is_triggered
-`self, label: str | list[str] | tuple[str, ...]`  
-`-> bool | list[bool] | tuple[bool, ...]`
-
-指定されたラベルごとに、有効かどうかを `True` または `False` で返します。  
-返り値の型は渡された引数によって変わります。
+- `indices`: 各ラベルで使う値を明示的に指定するインデックス
+- `all`: 登録済みの全ラベルを有効化します
+- `cond`: 条件が `True` の場合のみラベルの有効化を適用します
+- `after`: 指定秒数後にラベルを有効化します
+- `reschedule`: 同じラベル群に対する既存の遅延予約を置き換えます
 
 ```python
 from triggon import Triggon
 
-tg = Triggon({"A": None, "B": None, "C": None, "D": None})
+tg = Triggon.from_labels({"A": 10, "B": 20})
 
-tg.set_trigger(("A", "D"))
+tg.set_trigger(all=True)
 
-print(tg.is_triggered("A"))                # 出力: True
-print(tg.is_triggered(["C", "D"]))         # 出力: [False, True]
-print(tg.is_triggered("A", "B", "C", "D")) # 出力: (True, False, False, True)
-```
-
----
-
-### switch_lit
-`self, label: str | list[str] | tuple[str, ...], /,`  
-`org: Any,`  
-`*, index: int = None`  
-`-> Any`
-
-ラベルが有効な場合に、その値を切り替えます。  
-複数のラベルが渡されていて、そのうち複数が有効な場合は、  
-配列内でインデックスが小さいものが優先されます。
-
-**変数を直接参照することはできません。**
-
-戻り値が `TrigFunc` クラスで遅延実行されてる関数の場合、  
-それを自動的に実行しその戻り値を返します。
-
-複数のラベルに対して `index` キーワードが指定された場合は、  
-全てのラベルに適用されます。
-
-```python
-from triggon import Triggon, TrigFunc
-
-F = TrigFunc() # 関数の遅延実行用ラッパ
-tg = Triggon("text", new=F.print("After")) 
-
-def example():
-    tg.switch_lit("text", org=F.print("Before"))
-
-example() # 出力: Before
-
-tg.set_trigger("text")
-example() # 出力: After
-```
-
-また、インデックスを指定するために、接頭辞として `*` を使うこともできます。  
-たとえば、`"label"` はインデックス 0 を、`"*label"` はインデックス１を指します。
-接頭辞以外の場所で使われた `*` はインデックスとして認識されないので、無視されます。
-キーワード引数と `*` 両方が指定されている場合は、**キーワード引数の方が優先されます。**  
-
-> **Note:**  複数のインデックスを扱う場合は、可読性のため`index`キーワードの使用を推奨します。
-
-```python
-# インデックス 0 に "A" を、インデックス 1 に "B" を設定
-tg = Triggon("char", new=("A", "B"))
-
-def example():
-    tg.set_trigger("char")
-
-    print(tg.switch_lit("char", 0))           # インデックス 0（'*'なし＝デフォルトでインデックス0）
-    print(tg.switch_lit("*char", 1))          # インデックス 1（'*'で指定）
-    print(tg.switch_lit("*char", 0, index=0)) # インデックス 0（'index'が'*'より優先）
-    print(tg.switch_lit("char", 1, index=1))  # インデックス 1（'index'で指定）
-
-example()
-# == 出力 ==
-# A
-# B
-# A
-# B
+print(tg.switch_lit("A", original_val=1))
+# 10
+print(tg.switch_lit("B", original_val=2))
+# 20
 ```
 
 ```python
-tg = Triggon({"A": True, "B": False})
+from time import sleep
 
-def sample():
-    # いずれかのラベルが有効なら、新しい値が適用されます。
-    # 両方が有効な場合は、先に指定された方が優先されます。
-    x = tg.switch_lit(["A", "B"], None)
+x = 0
 
-    print(x)
+tg = Triggon.from_label("A", new_values=50)
+tg.register_ref("A", name="x")
 
-sample()            # Output: None 
+tg.set_trigger("A", after=0.5)
 
-tg.set_trigger("A") # Output: True
-sample()
-
-tg.set_trigger("B") # Output: True
-sample()
+print(x)
+# 0
+sleep(0.6)
+print(x)
+# 50
 ```
 
----
+#### `is_triggered()`
 
-### switch_var
-`self, label: str | dict[str, Any], var: Any = None, /,`  
-`*, index: int = None`  
-`-> Any`
-
-指定されたラベルとインデックスで変数を登録します。  
-ラベルが有効の場合、値を切り替えます。  
-変数がすでに登録されている場合は、値の切り替えは `set_trigger()` によって処理されます。  
-
-**対応しているのはグローバル変数とクラス変数で、ローカル変数には対応していません。**  
-クラス変数をグローバルスコープから登録した場合は `InvalidClassVarError` が発生します。
-
-単一のラベルで渡された場合のみ引数の値を返し、それ以外は `None` を返します。  
-戻り値が `TrigFunc` クラスで遅延実行されてる関数の場合、  
-それを自動的に実行しその戻り値を返します。
-
-また、インデックスを指定するために、接頭辞として `*` を使うこともできます。  
-たとえば、`"label"` はインデックス 0 を、`"*label"` はインデックス１を指します。
-接頭辞以外の場所で使われた `*` はインデックスとして認識されないので、無視されます。
-キーワード引数と `*` 両方が指定されている場合は、**キーワード引数の方が優先されます。**  
-
-複数のラベルにそれぞれ違うインデックスを指定したい場合は、`*` を使ってください。
+1 つ以上のラベルが現在有効かどうかを確認します。
 
 ```python
-import random
+is_triggered(*labels, match_all=True) -> bool
+```
 
+`labels` には、複数の位置引数としてラベルを渡すことも、単一のラベルシーケンスを渡すこともできます。
+
+`match_all` が `True` の場合は、指定したラベルがすべて有効なときにのみ `True` を返します。`False` の場合は、いずれか1つでも有効なら `True` を返します。
+
+```python
+tg = Triggon.from_labels({"A": 1, "B": 2})
+tg.set_trigger("B")
+
+print(tg.is_triggered("A"))
+# False
+print(tg.is_triggered("A", "B", match_all=False))
+# True
+```
+
+#### `switch_lit()`
+
+選択されたラベルに登録されている値を返します。指定されたラベルのいずれも有効でない場合は、`original_val` を返します。
+
+```python
+switch_lit(labels, /, original_val, *, indices=None) -> Any
+```
+
+`labels` には、単一のラベルまたはラベルのシーケンスを渡せます。
+
+`indices` には、単一のインデックスまたはインデックスのシーケンスを渡せます。
+
+複数ラベルが有効な場合は、シーケンス内で最初に有効なラベルが使われます。\
+そのラベルで選択された値が `TrigFunc` によって遅延されている場合は、自動的に実行され、その結果が返されます。
+
+`indices` を使うと、各ラベルでどの値を使うかを明示的に指定できます。\
+`*` が付いたラベルでは、`*` の数によってインデックスが決まりますが、明示的に指定した `indices` がある場合はそちらが優先されます。
+
+```python
+tg = Triggon.from_labels({"A": "dev", "B": "prod"})
+
+tg.set_trigger(all=True)
+
+print(tg.switch_lit(("B", "A"), original_val="local"))
+# prod
+print(tg.switch_lit(("A", "B"), original_val="local"))
+# dev
+```
+
+#### `register_ref()` / `register_refs()`
+
+グローバル変数や属性パスを登録し、対応するラベルが有効になったときに `set_trigger()` で自動更新できるようにします。
+
+```python
+register_ref(label, /, name, *, index=None) -> None
+register_refs(label_to_refs, /) -> None
+```
+
+補足:
+
+- 通常のローカル変数は直接登録できません
+- 属性パスの起点は現在のローカルスコープまたはグローバル名前空間から解決されます
+- ラベルがすでに有効の場合、登録時に即座に対象を更新します
+- 適用される値が遅延済みの `TrigFunc` であれば、更新時に自動実行されます
+- 一致判定は現在のファイルと呼び出し箇所のスコープに基づいて行われます
+
+`register_ref()` では、対象を登録した時点でそのラベルがすでに有効な場合、`index` を使って適用するインデックス値を指定できます。\
+ラベルの先頭に `*` が付いている場合は、その `*` の数によってインデックスが決まりますが、明示的に指定した `index` がある場合はそちらが優先されます。
+
+```python
 from triggon import Triggon
 
-tg = Triggon({
-    "level_1": ["ノーマル", 80],
-    "level_2": ["レア", 100],
-    "level_3": ["伝説の", 150],
-})
+tg = Triggon.from_labels({"enabled": True, "name": "prod"})
 
-level = None
-attack = None
+flag = False
 
-def spin_gacha():
-    items = ["level_1", "level_2", "level_3"]
-    result = random.choice(items)
 
-    tg.set_trigger(result)
+class Config:
+    value = "local"
 
-    tg.switch_var(result, level)
-    tg.switch_var(result, attack, index=1)
 
-    # 出力はランダムに変わります。
-    # 例: result = "level_2"の場合
-    print(f"{level}ソードを取得しました！") # 出力例: レアソードソードを取得しました！
-    print(f"攻撃力: {attack}")    # 出力例: 攻撃力: 100 
+tg.set_trigger("enabled")
+tg.register_ref("enabled", name="flag") # "enabled" はすでに有効なので即時更新される
+tg.register_ref("name", name="Config.value")
 
-spin_gacha()
+print(flag)
+# True
+
+tg.set_trigger("name")
+print(Config.value)
+# prod
 ```
 
-また、１つの変数に対して複数の設定値に切り替えることも可能です。
+`register_refs()` を使うと、`{label: {target_name: index}}` の形式で複数の対象をまとめて登録できます。
 
 ```python
-import math
-
-from triggon import Triggon, TrigFunc
-
-F = TrigFunc()
-tg = Triggon("var", new=["ABC", True, F.math.sqrt(100)])
-
-x = None
-
-tg.set_trigger("var")
-
-value = tg.switch_var("var", x)
-print(value) # 出力: "ABC"
-
-tg.set_trigger("var", index=1)
-print(x)     # 出力: True
-
-# 返り値が `TrigFunc` によって遅延されてる関数の場合、
-# set_trigger()は自動実行はしません
-tg.set_trigger("var", index=2)
-print(x) # 出力: <function TrigFunc...>
-
-# その場合は、自分で実行必要があります
-if tg.is_triggered("var"):
-    print(x()) # 出力: 10.0
-
-# switch_var()の場合は、自動で実行しその値を返します
-value = tg.switch_var("var", x, index=2)
-print(value) # 出力: 10.0
+tg.register_refs(
+    {
+        "enabled": {"flag": 0},
+        "name": {"Config.value": 0},
+    }
+)
 ```
 
-> **Notes:**
-> 値の更新は基本的に `set_trigger()` が呼ばれたときに行われます。  
-> ただし初回のみ、`switch_var()` によって対象変数が登録されていない限り、値は変化しません。  
-> その場合、値の変更は `switch_var()` で行われます。  
-> 一度登録されれば、その後の `set_trigger()` 呼び出しで即座に値が更新されます。　
->
-> 一部の実行環境では、`switch_var()` の呼び出しを静的に検出できず、  
-> エラーになることがあります（例：Jupyter、REPLなど）。
->
-> この関数では、ラベルおよび `index` 引数にリテラル値・変数・属性チェーン以外を指定すると、
-> `InvalidArgumentError` が発生します。
+#### `is_registered()`
 
----
-
-### is_registered
-`self, *variable: str`  
-`-> bool | list[bool] | tuple[bool, ...]`
-
-指定された変数ごとに、登録済みかどうかを `True` または `False` で返します。  
-返り値の型は渡された引数によって変わります。
-
-渡された引数が変数ではない場合、 `InvalidArgumentError` が発生します。
+対象名が現在のファイルと呼び出し箇所のスコープ内で登録済みかどうかを確認します。
 
 ```python
-tg = Triggon("var", None)
-
-@dataclass
-class Sample:
-    x: int = 0
-    y: int = 0
-    z: int = 0
-
-    def func(self):
-        tg.switch_var("var", (self.x, self.z))
-        print(tg.is_registered(["self.y", "self.z"]))
-
-smp = Sample()
-smp.func() # 出力: [False, True]
-
-print(tg.is_registered("smp.x"))                # 出力: True
-print(tg.is_registered("Sample.x", "Sample.y")) # 出力: [True, False]
+is_registered(*names, label=None, match_all=True) -> bool
 ```
 
----
+`names` には、複数の位置引数として対象名を渡すことも、単一の対象名のシーケンスを渡すこともできます。
 
-### revert
-`self, label: str | list[str] | tuple[str, ...] = None, /,`  
-`*,`  
-`all: bool = False,`  
-`disable: bool = False,`  
-`cond: str = None,`  
-`after: int | float = None`  
-`-> None`
+判定は現在の値やオブジェクト状態ではなく、登録された名前情報に基づいて行われます。
 
-指定されたラベルを無効化して、元の値に戻します。
+キーワード引数:
 
-この状態は、次に `set_trigger()` が呼び出されるまで有効です。  
-指定されたラベルに関連付けられたすべての値が、元に戻されます。
-
-#### ***all***
-`True` に設定すると、すべてのラベルを無効にします。
-
-### ***disable***
-`True` に設定すると、すべてのラベルを永続的に無効にします。
-
-この状態のラベルは、`set_trigger()` で有効化されません。
+- `label`: 判定対象を 1 つのラベルに絞り込みます
+- `match_all`: 指定した全 name が登録済みのときだけ `True` を返します。いずれか 1 つでよい場合は `False` を使います。
 
 ```python
-tg = Triggon("flag", new="有効状態")
+tg = Triggon.from_label("A", None)
 
-def sample():
-    tg.set_trigger("flag") # Activate "flag" on each call
+a = 0
+b = 0
+tg.register_ref("A", name="a")
 
-    x = tg.switch_lit("flag", org="無効状態")
-    print(x)
-
-sample() # 出力: 有効状態
-
-# The effect persists until the next call to set_trigger()
-tg.revert("flag")
-sample() # 出力: 有効状態
-
-# Permanently disable "flag"
-tg.revert("flag", disable=True)
-sample() # 出力: 無効状態
+print(tg.is_registered("a", "b"))
+# False
+print(tg.is_registered("a", "b", match_all=False))
+# True
 ```
 
-#### ***cond***
-ラベルを無効にする条件を設定します。
+#### `unregister_refs()`
 
-> **⚠️ Note:**  
-> この引数の処理には内部的に `eval()` を使用します。  
-> **比較式のみ許可**されています（例: `x > 0 > y`, `value == 10`）。  
-> 単体のリテラル値、または変数が渡された場合、  
-> 値が `ブール値` 以外の時 `InvalidArgumentError` が発生します。  
-> 関数呼び出しの場合も同様です。
-
-#### ***after***
-ラベルを無効化するまでの遅延時間を秒数で指定します。  
-遅延中に再度指定された場合は上書きされずに、最初の秒数が維持されます。
-
-> **⚠️ Note:**  
-> 実際の実行は、指定した時間より **およそ 0.011 秒後** に行われます。
+選択したラベルから 1 つ以上の登録済み name を解除します。
 
 ```python
-from dataclasses import dataclass
+unregister_refs(names, /, *, labels=None) -> None
+```
 
+`names` は、1つの登録済み名前、またはそれらのシーケンスを受け取ります。
+
+`labels` は、1つのラベル、またはラベルのシーケンスを受け取ります。
+
+`labels` が指定された場合、そのラベルからのみ name を解除します。省略した場合は登録済みの全ラベルから解除されます。
+
+#### `revert()`
+
+ラベルを無効化し、登録済みの対象を元の値に戻します。
+
+```python
+revert(
+    labels=None,
+    /,
+    *,
+    all=False,
+    disable=False,
+    cond="",
+    after=0,
+    reschedule=False,
+) -> None
+```
+
+`labels` は、1つのラベル、またはラベルのシーケンスを受け取ります。
+
+キーワード引数:
+
+- `all`: 登録済みの全ラベルを無効化します
+- `disable`: 対象ラベルを永久的に無効化します
+- `cond`: 条件が `True` の場合のみラベルの無効化を適用します
+- `after`: 指定秒数後にラベルを無効化します
+- `reschedule`: 同じラベル群に対する既存の遅延予約を置き換えます
+
+```python
 from triggon import Triggon
 
-tg = Triggon("hi", new="こんにちは")
+tg = Triggon.from_label("status", new_values="active")
 
-@dataclass
-class User:
-    name: str = "Guest"
-    init_done: bool = False
+tg.set_trigger("status")
+print(tg.switch_lit("status", original_val="inactive"))
+# active
 
-    def initialize(self):
-        # 初回の挨拶用にトリガーをセット
-        tg.set_trigger("hi")
-        self.init_done = True
-        self.greet()
-
-    def greet(self):
-        msg = tg.switch_lit("hi", org="おかえりなさい")
-        print(f"{msg}, {self.name}!")
-
-    def entry(self):
-        if self.init_done:
-            self.greet()
-        else:
-            self.initialize()
-            tg.revert("hi")  # 値を元に戻す
-
-user = User()
-user.entry()  # 出力: こんにちは, Guest!
-user.entry()  # 出力: おかえりなさい, Guest!
+tg.revert("status")
+print(tg.switch_lit("status", original_val="inactive"))
+# inactive
 ```
 
 ```python
-tg = Triggon({"name": "太郎", "state": True})
+tg = Triggon.from_label("status", new_values="active")
 
-@dataclass
-class User:
-    name: str = None
-    online: bool = False
 
-    def login(self):
-        # 各ラベルに変数を設定
-        tg.switch_var({"name": self.name, "state": self.online})
-        tg.set_trigger(["name", "state"])
+def get_status():
+    tg.set_trigger("status")
+    return tg.switch_lit("status", "inactive")
 
-user = User()
-print(f"User name: {user.name}\nOnline: {user.online}")
-# == Output ==
-# User name: None
-# Online: False
 
-user.login()
-print(f"User name: {user.name}\nOnline: {user.online}")
-# == Output ==
-# User name: 太郎
-# Online: True
+print(get_status())
+# "active"
+
+tg.revert("status", disable=True)
+print(get_status())
+# inactive
 ```
 
----
+#### `capture_return()` / `trigger_return()`
 
-### exit_point
-`self, func: TrigFunc`  
-`-> Any`
-
-`trigger_return()` によって早期リターンで抜ける関数の出口を設定します。  
-`func` 引数には、対象関数をラップした `TrigFunc` インスタンスを渡す必要があります。
-
-> **Note:** `trigger_return()`が実行されない場合は、この関数を使用する必要はありません。
-
----
-
-### trigger_return
-`self, label: str | list[str] | tuple[str, ...], /,`  
-`ret: Any = ...,`  
-`*, index: int = None`  
-`-> Any`
-
-指定されたいずれかのラベルが有効な場合に、早期リターンを発動させます。  
-返す値はインスタンス作成時に設定しておく必要があります。  
-戻り値が必要がない場合は、`None` またはラベルのみ渡してください（辞書型でない場合のみ）。
-
-キーワード引数 `ret` を使って戻り値を設定することもできます。  
-その場合、**初期化時に設定された値は無視され、その値が返されます**。  
-動的に戻り値を設定したい場合に使用してください。 
-
-戻り値が `TrigFunc` クラスで遅延実行されてる関数の場合、  
-それを自動的に実行しその戻り値を返します。
+指定したラベルが有効な場合に、スコープ付きのコンテキスト内で早期リターンします。
 
 ```python
-from triggon import Triggon, TrigFunc
+capture_return() -> ContextManager[EarlyReturnResult]
+trigger_return(labels, /, *, value=None) -> Any
+```
 
-tg = Triggon("ret", None)
+`labels` は、1つのラベル、またはラベルのシーケンスを受け取ります。
 
-def sample(num):
-    added = num + 5
-    tg.set_trigger("ret", cond="added < 10")
+`capture_return()` はコンテキストマネージャとして使い、その中で早期リターンしたい場合に `trigger_return()` を呼びます。
 
-    # 'added'が10より小さい場合、早期リターン
-    tg.trigger_return("ret")
+`EarlyReturnResult` で利用できるフィールド:
 
-    result = added / 10
+- `triggered`: `trigger_return()` が発動したかどうか
+- `value`: 早期リターン時の戻り値
+
+`trigger_return()` では、`value` を使って戻り値を指定できます。
+
+補足:
+
+- `trigger_return()` は `capture_return()` の中でのみ動作します
+- `value` に渡した `TrigFunc` による遅延値は、結果が保存される前に `capture_return()` によって実行されます
+
+```python
+from triggon import Triggon
+
+tg = Triggon.from_label("stop", new_values=True)
+
+
+def task():
+    print("start")
+    tg.trigger_return("stop", value="stopped")
+    print("end")
+
+
+def main():
+    with tg.capture_return() as result:
+        task()
+        print("after task")
     return result
 
-F = TrigFunc() # 遅延用の変数
 
-result = tg.exit_point(F.sample(10))
-print(result) # 出力: 1.5
-
-result = tg.exit_point(F.sample(3))
-print(result) # 出力: None
-```
-
-```python
-tg = Triggon("skip") # 戻り値が必要ない場合はラベルのみ渡しても問題ありません
-F = TrigFunc()
-
-def sample():    
-    # "skip"が有効な場合、指定の関数を呼んで、
-    # 早期リターンと一緒にその戻り値を返す
-    ret_value = tg.trigger_func("skip", F.func())
-    tg.trigger_return("skip", ret=ret_value)
-
-    print("戻り値なし")
-
-def func():
-    return "戻り値あり"
-
-value = sample()
-print(value)
-# == 出力 ==
-# 戻り値なし
+result = main()
+# start
+# end
+# after task
+print(result.triggered)
+# False
+print(result.value)
 # None
 
-tg.set_trigger("skip") # "skip"を有効にする
-value = tg.exit_point(F.sample())
-print(value)
-# == 出力 ==
-# 戻り値あり
+tg.set_trigger("stop")
+
+result = main()
+# start
+print(result.triggered)
+# True
+print(result.value)
+# stopped
 ```
 
----
+#### `trigger_call()`
 
-### trigger_func
-`self, label: str | list[str] | tuple[str, ...], /,`  
-`func: TrigFunc`  
-`-> Any`
-
-指定されたいずれかのラベルが有効の場合に、関数を呼び出します。  
-`func` 引数には、対象の関数をラップした `TrigFunc` インスタンスを渡す必要があります。
-
-ラベルはインスタンス作成時に登録しておく必要がありますが、  
-設定した値が返されることはないため、どんな値でも正常に動作します。   
-またはラベルのみ渡してください（辞書型でない場合のみ）。  
-**対象の関数が値を返す場合は、その値が返されます。**
+指定したラベルのいずれかが有効な場合に、遅延された `TrigFunc` の対象を実行します。
 
 ```python
-from triggon import Triggon, TrigFunc
-
-tg = Triggon({
-    "skip": None,
-    "call": None,
-})
-
-def func_a():
-    tg.set_trigger(all=True) # 全てのラベルを有効にする
-
-    print("'call'フラグが有効なら、func_b()が呼ばれます。")
-
-    tg.trigger_func("call", F.func_b())
-
-    print("このメッセージは出力されないかも。")
-
-
-def func_b():
-    print("func_b()に到達！")
-    tg.trigger_return("skip")
-
-F = TrigFunc()
-tg.exit_point("skip", F.func_a())
-# == 出力 ==
-# 'call'フラグが有効なら、func_b()が呼ばれます。
-# func_b()に到達！
+trigger_call(labels, /, target) -> Any
 ```
 
----
+`labels` は、1つのラベル、またはラベルのシーケンスを受け取ります。
+
+`target` には、呼び出しで終わる遅延 `TrigFunc` の呼び出しチェーンを指定する必要があります。
+
+```python
+from triggon import TrigFunc, Triggon
+
+tg = Triggon.from_label("debug", new_values=True)
+f = TrigFunc()
+
+
+def show_debug():
+    print("debug mode")
+
+
+tg.trigger_call("debug", target=f.show_debug())
+# 出力なし
+
+tg.set_trigger("debug")
+tg.trigger_call("debug", target=f.show_debug())
+# debug mode
+```
+
+#### `rollback()`
+
+対象の値を一時的に変更し、コンテキストを抜けると自動的に元に戻します。
+
+```python
+rollback(targets=None) -> ContextManager[None]
+```
+
+補足:
+
+- CPython 3.13 以降が必要です
+- `"x"` や `"obj.value"` のような対象名を明示的に渡せます
+- `targets` を省略した場合は、ブロック内の代入対象が自動的に収集されます
+
+```python
+from triggon import Triggon
+
+x = 1
+
+with Triggon.rollback():
+    x = 99
+    print(x)
+    # 99
+
+print(x)
+# 1
+```
 
 ### TrigFunc
-このクラスは関数の実行を遅延させるために使います。  
-引数なしでインスタンスを作成し、その変数を対象の関数にラップして利用してください。
 
-既存ライブラリのほとんどの関数や自作関数を遅延できますが、  
-インスタンスメソッドには対応していません。
+`TrigFunc` は、関数やメソッドの呼び出しをすぐに実行せず、遅延呼び出しとして記録します。\
+記録されたチェーンは、あとから `switch_lit()`、`trigger_call()`、`trigger_return()` で利用できます。
 
-> ⚠️ **注意:**  
-> `TrigFunc` では、インスタンスを生成してすぐにメソッドをチェーン呼び出しすることはできません  
-> （例: `F.Sample(10).method()`）。  
->  
-> まず通常どおりインスタンスを生成して変数に代入し、  
-> その変数を通じて `TrigFunc` からメソッドを呼び出してください。  
-> （例: `smp = Sample(10)` → `F.smp.method()`）
+```python
+TrigFunc()
+```
 
----
+主な用途:
 
-### エラー
+- `switch_lit()` 用のラベルデータに遅延値を保存する
+- `trigger_call()` で遅延呼び出しを実行する
+- `trigger_return()` で遅延値を戻り値として返す
 
-#### ***InvalidArgumentError***
-引数の数、または使い方に誤りがある場合に発生します。
+遅延された名前は、チェーン実行時に、捕捉されたローカルスコープ・グローバルスコープ・builtins から解決されます。\
+`TrigFunc` のインスタンス自体も、スコープをまたいで再利用できます。
 
-#### ***InvalidClassVarError***
-`switch_var()`でクラス変数をグローバルスコープから登録した場合に発生します。
+```python
+from triggon import TrigFunc, Triggon
 
-#### ***MissingLabelError***
-設定されたラベルが登録されていない場合に発生します。
+def greet(name):
+    return f"hello, {name}"
+
+
+f = TrigFunc()
+tg = Triggon.from_label("greet", new_values=f.greet("world"))
+
+tg.set_trigger("greet")
+print(tg.switch_lit("greet", original_val=None))
+# hello, world
+```
+
+### デバッグログ
+
+`Triggon(...)`、`from_label()`、`from_labels()` に `debug=` を渡すことで、デバッグ出力を有効にできます。
+
+- `debug=False`: ログ出力を無効にします
+- `debug=True`: 環境変数の設定を使います。未設定の場合は verbosity `3` が使われます
+- `debug="A"` または `debug=("A", "B")`: 出力対象を指定したラベルに限定します
+
+環境変数:
+
+- `TRIGGON_LOG_VERBOSITY`
+  - `0`: オフ
+  - `1`: trigger、revert、early-return、trigger-call のイベントを記録
+  - `2`: さらに値の更新も記録
+  - `3`: さらに遅延処理や register / unregister イベントも記録
+- `TRIGGON_LOG_FILE`: stderr の代わりにファイルへログを書き込みます
+- `TRIGGON_LOG_LABELS`: `debug=True` のときに使われる、カンマ区切りのラベルフィルタ
+
+### 例外
+
+- `InvalidArgumentError`: 公開 API に無効な引数、または無効な引数の組み合わせが渡された場合
+- `UnregisteredLabelError`: 登録されていないラベルを操作しようとした場合
+- `InactiveCaptureError`: `capture_return()` の外で `trigger_return()` が呼ばれた場合
+- `RollbackNotSupportedError`: `rollback()` が CPython 3.13 より前の実行環境で使われた場合
+- `UpdateError`: 登録された対象を更新または復元できなかった場合
 
 ## ライセンス
-このプロジェクトは MIT ライセンスの下で公開されています。　
-詳細は LICENSE をご覧ください。
 
-## 開発者
-Tsuruko  
-GitHub: [@tsuruko12](https://github.com/tsuruko12)  
-X: [@12tsuruko](https://x.com/12tsuruko)
+このプロジェクトは MIT ライセンスの下で公開されています。
+詳細は [LICENSE](./LICENSE) を参照してください。
+
+## 作者
+
+作者: Tsuruko
+GitHub: [@tsuruko12](https://github.com/tsuruko12)
+X: [@tool_tsuruko12](https://x.com/12tsuruko)
