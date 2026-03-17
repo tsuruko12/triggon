@@ -3,7 +3,7 @@
 [![PyPI](https://img.shields.io/pypi/v/triggon)](https://pypi.org/project/triggon/)
 ![Python](https://img.shields.io/pypi/pyversions/triggon)
 ![Python](https://img.shields.io/pypi/l/triggon)
-![Package Size](https://img.shields.io/badge/size-35.3kB-lightgrey)
+![Package Size](https://img.shields.io/badge/size-36.2kB-lightgrey)
 [![Downloads](https://pepy.tech/badge/triggon)](https://pepy.tech/project/triggon)
 
 ## Overview
