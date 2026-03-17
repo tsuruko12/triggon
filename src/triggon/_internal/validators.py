@@ -11,7 +11,9 @@ def check_debug(debug: Any) -> None:
         return
 
     if not isinstance(debug, Sequence):
-        _raise_type_error(arg_name="debug", type_msg="bool, str, or Sequence[str]")
+        _raise_type_error(
+            arg_name="debug", type_msg="bool, str, or Sequence", actual_value=debug
+        )
 
     if isinstance(debug, Sequence):
         if not debug:
@@ -26,9 +28,9 @@ def check_str_sequence(arg_name: str, args: Any, allow_multi: bool = True) -> No
         return
 
     if not allow_multi:
-        _raise_type_error(arg_name, type_msg="str")
+        _raise_type_error(arg_name, type_msg="str", actual_value=args)
     if not isinstance(args, Sequence):
-        _raise_type_error(arg_name, type_msg="str or Sequence[str]")
+        _raise_type_error(arg_name, type_msg="str or Sequence", actual_value=args)
 
     if isinstance(args, Sequence):
         if not args:
@@ -42,10 +44,12 @@ def check_str_sequence(arg_name: str, args: Any, allow_multi: bool = True) -> No
 def check_items(arg_name: str, arg: Any) -> None:
     if not isinstance(arg, Mapping):
         if arg_name == "label_values":
-            _raise_type_error(arg_name, type_msg="Mapping[str, Any]")
+            _raise_type_error(arg_name, type_msg="Mapping", actual_value=arg)
         else:
             # 'label_to_refs'
-            _raise_type_error(arg_name, type_msg="Mapping[str, Mapping[str, int]]")
+            _raise_type_error(
+                arg_name, type_msg="Mapping", actual_value=arg
+            )
 
     if not arg:
         _raise_value_error(arg_name)
@@ -59,7 +63,7 @@ def check_items(arg_name: str, arg: Any) -> None:
             if not isinstance(val, Mapping):
                 _raise_type_error(
                     arg_name,
-                    type_msg="Mapping[str, int]",
+                    type_msg="Mapping",
                     actual_value=val,
                     key=key,
                 )
@@ -79,10 +83,10 @@ def check_idxs(idxs: Any, allow_multi=True) -> None:
         return
 
     if not allow_multi:
-        _raise_type_error(arg_name="index", type_msg="int")
+        _raise_type_error(arg_name="index", type_msg="int", actual_value=idxs)
 
     if not isinstance(idxs, Sequence):
-        _raise_type_error(arg_name="indices", type_msg="int or Sequence[int]")
+        _raise_type_error(arg_name="indices", type_msg="int or Sequence", actual_value=idxs)
     if not idxs:
         _raise_value_error(arg_name="indices")
 
@@ -94,13 +98,13 @@ def check_idxs(idxs: Any, allow_multi=True) -> None:
 
 def check_after(after: Any) -> None:
     if not isinstance(after, (int, float)):
-        _raise_type_error(arg_name="after", type_msg="int or float")
+        _raise_type_error(arg_name="after", type_msg="int or float", actual_value=after)
     _ensure_non_negative(after, "after")
 
 
 def check_bool(arg: Any, arg_name: str) -> None:
     if not isinstance(arg, bool):
-        _raise_type_error(arg_name, type_msg="bool")
+        _raise_type_error(arg_name, type_msg="bool", actual_value=arg)
 
 
 def _ensure_non_negative(num: int | float | Sequence[int], arg_name: NumArg) -> None:
@@ -115,7 +119,7 @@ def _ensure_non_negative(num: int | float | Sequence[int], arg_name: NumArg) -> 
 
 def check_cond(cond: Any) -> None:
     if not isinstance(cond, str):
-        _raise_type_error(arg_name="cond", type_msg="str")
+        _raise_type_error(arg_name="cond", type_msg="str", actual_value=cond)
 
 
 def _raise_type_error(
@@ -126,12 +130,10 @@ def _raise_type_error(
     key: Any = _NO_VALUE,
 ) -> None:
     if actual_value is _NO_VALUE:
-        if key is _NO_VALUE:
-            raise TypeError(f"{arg_name} must be {type_msg}")
-        else:
-            raise TypeError(
-                f"{arg_name}: expected key type {type_msg}, got {type(key).__name__} (key={key!r})"
-            )
+        # key error
+        raise TypeError(
+            f"{arg_name}: expected key type {type_msg}, got {type(key).__name__} (key={key!r})"
+        )
     else:
         if idx is not None:
             raise TypeError(
@@ -142,6 +144,7 @@ def _raise_type_error(
                 f"{arg_name}[{key!r}]: expected value type {type_msg}, "
                 f"got {type(actual_value).__name__}"
             )
+        raise TypeError(f"{arg_name} must be {type_msg}, got {type(actual_value).__name__}")
 
 
 def _raise_value_error(arg_name: str) -> None:
