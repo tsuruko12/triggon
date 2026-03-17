@@ -1,9 +1,9 @@
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Self
 
-from .._internal._types.aliases import (
+from ._internal._types.aliases import (
     DebugArg,
     IndexArg,
     LabelArg,
@@ -33,6 +33,8 @@ class Triggon:
         *,
         debug: DebugArg = False,
     ) -> Self: ...
+    def add_label(self, label: str, /, new_values: Any = None) -> None: ...
+    def add_labels(self, label_values: Mapping[str, Any], /) -> None: ...
     def set_trigger(
         self,
         labels: LabelArg | None = None,
@@ -62,7 +64,7 @@ class Triggon:
         index: int | None = None,
     ) -> None: ...
     def register_refs(self, label_to_refs: LabelToRefs, /) -> None: ...
-    def unregister_refs(self, names: NameArg, labels: LabelArg | None = None) -> None: ...
+    def unregister_refs(self, names: NameArg, /, *, labels: LabelArg | None = None) -> None: ...
     def is_registered(
         self,
         *names: NameArg,
@@ -82,17 +84,16 @@ class Triggon:
     ) -> None: ...
     @staticmethod
     @contextmanager
-    def rollback(targets: NameArg | None = None) -> Any: ...
+    def rollback(targets: NameArg | None = None) -> Iterator[None]: ...
     @contextmanager
-    def capture_return(self) -> Any: ...
+    def capture_return(self) -> Iterator[EarlyReturnResult]: ...
     def trigger_return(
         self,
         labels: LabelArg,
         /,
         *,
-        indices: IndexArg | None = None,
         value: Any = None,
-    ) -> Any: ...
+    ) -> None: ...
     def trigger_call(
         self,
         labels: LabelArg,
