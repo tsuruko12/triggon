@@ -104,8 +104,8 @@ tg = Triggon.from_labels(
 `add_labels()` は、マッピングを使って1つ以上のラベルとその値を追加します。
 
 ```python
-add_label(label, new_values=None) -> None
-add_labels(label_values) -> None
+add_label(label, /, new_values=None) -> None
+add_labels(label_values, /) -> None
 ```
 
 すでに登録済みのラベルは無視されます。
@@ -388,7 +388,7 @@ print(get_status())
 
 ```python
 capture_return() -> ContextManager[EarlyReturnResult]
-trigger_return(labels, /, *, value=None) -> Any
+trigger_return(labels, /, *, value=None) -> None
 ```
 
 `labels` は、1つのラベル、またはラベルのシーケンスを受け取ります。

@@ -104,8 +104,8 @@ tg = Triggon.from_labels(
 `add_labels()` adds one or more labels and their values from a mapping.
 
 ```python
-add_label(label, new_values=None) -> None
-add_labels(label_values) -> None
+add_label(label, /, new_values=None) -> None
+add_labels(label_values, /) -> None
 ```
 
 If a label is already registered, it is ignored.
@@ -391,7 +391,7 @@ Returns early within a scoped context when specified labels are active.
 
 ```python
 capture_return() -> ContextManager[EarlyReturnResult]
-trigger_return(labels, /, *, value=None) -> Any
+trigger_return(labels, /, *, value=None) -> None
 ```
 
 `labels` accepts a single label or a sequence of labels.
