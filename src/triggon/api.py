@@ -2,7 +2,7 @@ import logging
 import sys
 import threading
 from contextlib import contextmanager
-from collections.abc import Iterator, Mapping, Sequence, ValuesView
+from collections.abc import Iterator, KeysView, Mapping, Sequence, ValuesView
 from dataclasses import dataclass
 from typing import Any, Self
 
@@ -153,13 +153,24 @@ class Triggon(_Core, _Internal):
         self,
         labels: tuple[str, ...],
         values: tuple[Any, ...] | ValuesView[Any],
+        add: bool = False,
     ) -> None:
+        if add and self.debug[LOG_VERBOSITY] == 3:
+            debug_on = True
+            frame = get_target_frame(depth=2)
+            callsite = get_callsite(frame)
+        else:
+            debug_on = False
+
         label_values = {}
 
         for label, val in zip(labels, values):
             if label in self._new_values:
                 continue
+
             self._add_new_labels(label)
+            if debug_on:
+                self.log_added_label(label, callsite)
 
             if isinstance(val, Sequence) and not isinstance(val, (str, bytes, bytearray)):
                 if len(val) >= 1:
@@ -265,10 +276,7 @@ class Triggon(_Core, _Internal):
         """
 
         check_str_sequence(arg_name="label", args=label, allow_multi=False)
-        label_tup, _ = self.resolve_labels_and_idxs(
-            label, idxs=None, allow_symbol=False, is_init=True
-        )
-        self._normalize_label_values(label_tup, (new_values,))
+        self._register_labels(label, (new_values,))
 
     def add_labels(self, label_values: Mapping[str, Any], /) -> None:
         """Register additional labels from a mapping.
@@ -290,10 +298,17 @@ class Triggon(_Core, _Internal):
         """
 
         check_items(arg_name="label_values", arg=label_values)
-        labels, _ = self.resolve_labels_and_idxs(
-            label_values.keys(), idxs=None, allow_symbol=False, is_init=True
+        self._register_labels(label_values.keys(), label_values.values())
+
+    def _register_labels(
+        self,
+        labels: str | KeysView[str],
+        values: Any,
+    ) -> None:
+        labels_tup, _ = self.resolve_labels_and_idxs(
+            labels, idxs=None, allow_symbol=False, is_init=True
         )
-        self._normalize_label_values(labels, label_values.values())
+        self._normalize_label_values(labels_tup, values, add=True)
 
     def set_trigger(
         self,
