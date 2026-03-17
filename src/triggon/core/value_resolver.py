@@ -57,6 +57,7 @@ ALLOWED_EXPRS = (
     ast.Compare,
     ast.Name,
     ast.Attribute,
+    ast.Subscript,
     ast.Constant,
     ast.BoolOp,
     ast.UnaryOp,
@@ -85,19 +86,17 @@ def evaluate_cond(frame: FrameType, expr: str) -> bool:
     try:
         tree = ast.parse(expr, mode="eval")
     except SyntaxError:
-        raise InvalidArgumentError("cond: only expressions are allowed") from None
-
-    expr_err = "cond: only comparison or boolean expressions are supported"
+        raise InvalidArgumentError("cond: expected an expression") from None
 
     body_nodes = tree.body
     if not isinstance(body_nodes, ALLOWED_EXPRS):
-        raise InvalidArgumentError(expr_err)
+        raise InvalidArgumentError("cond: unsupported expression type")
 
     var_scope = {}
 
     for node in ast.walk(body_nodes):
         if isinstance(node, DISALLOWED_NODES):
-            raise InvalidArgumentError(expr_err)
+            raise InvalidArgumentError("cond: unsupported expression syntax")
 
         if isinstance(node, ast.Name):
             value = _lookup_value_for_eval(frame, node.id)
@@ -181,9 +180,7 @@ def resolve_ref_info(
     if value is not _NO_VALUE and not has_attr_chain:
         if not allow_loc_var:
             if frame.f_globals is not frame.f_locals:
-                raise InvalidArgumentError(
-                    f"local variables cannot be registered: {target_name!r}"
-                )
+                raise InvalidArgumentError(f"local variables cannot be registered: {target_name!r}")
         else:
             return VarResult(kind=LOC_VAR, value=value, scope_name=scope_name)
     if value is _NO_VALUE:
