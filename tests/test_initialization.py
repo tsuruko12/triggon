@@ -177,3 +177,107 @@ def test_from_labels_rejects_non_map():
 def test_from_labels_rejects_non_str_key():
     with pytest.raises(TypeError):
         Triggon.from_labels({1: "A"})
+
+
+def test_add_labels_ignores_duplicate_labels():
+    tg = Triggon.from_label("A", new_values=1)
+
+    tg.add_labels({"A": 99, "B": 2})
+    tg.set_trigger(("A", "B"))
+
+    assert tg.switch_lit("A", 0) == 1
+    assert tg.switch_lit("B", 0) == 2
+
+
+def test_add_label_registers_single_label():
+    tg = Triggon.from_label("A", new_values=1)
+
+    tg.add_label("B", 2)
+    tg.set_trigger("B")
+
+    assert tg.switch_lit("A", 0) == 0
+    assert tg.switch_lit("B", 0) == 2
+
+
+def test_add_label_defaults_to_none():
+    tg = Triggon.from_label("A", new_values=1)
+
+    tg.add_label("B")
+    tg.set_trigger("B")
+
+    assert tg.switch_lit("B", 10) is None
+
+
+def test_add_label_seq_becomes_indexed():
+    tg = Triggon.from_label("A", new_values=1)
+
+    tg.add_label("B", [10, 20, 30])
+    tg.set_trigger("B", indices=1)
+
+    assert tg.switch_lit("B", 0, indices=1) == 20
+
+
+def test_add_labels_registers_multiple_labels():
+    tg = Triggon.from_label("A", new_values=1)
+
+    tg.add_labels({"B": 2, "C": ([3, 4],)})
+    tg.set_trigger(("B", "C"))
+
+    assert tg.switch_lit("B", 0) == 2
+    assert tg.switch_lit("C", 0) == [3, 4]
+
+
+def test_add_label_rejects_symbol_prefix():
+    tg = Triggon.from_label("A", new_values=1)
+
+    with pytest.raises(InvalidArgumentError):
+        tg.add_label("*B", 2)
+
+
+def test_add_label_rejects_non_str_label():
+    tg = Triggon.from_label("A", new_values=1)
+
+    with pytest.raises(TypeError):
+        tg.add_label(1, 2)
+
+
+def test_add_label_rejects_whitespace_label():
+    tg = Triggon.from_label("A", new_values=1)
+
+    with pytest.raises(InvalidArgumentError):
+        tg.add_label(" ", 2)
+
+
+def test_add_labels_rejects_symbol_prefix():
+    tg = Triggon.from_label("A", new_values=1)
+
+    with pytest.raises(InvalidArgumentError):
+        tg.add_labels({"*B": 2})
+
+
+def test_add_labels_rejects_empty_map():
+    tg = Triggon.from_label("A", new_values=1)
+
+    with pytest.raises(InvalidArgumentError):
+        tg.add_labels({})
+
+
+def test_add_labels_rejects_non_map():
+    tg = Triggon.from_label("A", new_values=1)
+
+    with pytest.raises(TypeError):
+        tg.add_labels([("B", 2)])
+
+
+def test_add_labels_rejects_non_str_key():
+    tg = Triggon.from_label("A", new_values=1)
+
+    with pytest.raises(TypeError):
+        tg.add_labels({1: 2})
+
+
+def test_add_labels_rejects_whitespace_key():
+    tg = Triggon.from_label("A", new_values=1)
+
+    with pytest.raises(InvalidArgumentError):
+        tg.add_labels({" ": 2})
