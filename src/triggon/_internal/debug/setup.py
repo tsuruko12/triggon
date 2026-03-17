@@ -4,7 +4,6 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ...errors.public import UnregisteredLabelError
 from .._types.aliases import DebugArg, LogFile, TargetLabels
 from .._types.structs import DebugConfig
 from ..keys import LOG_FILE, LOG_LABELS, LOG_VERBOSITY
@@ -12,7 +11,7 @@ from ..lock import UPDATE_LOCK
 
 # Trigger logs appear at all levels.
 # Value update logs appear at level 2 and above.
-# Delay logs and variable/attribute register/unregister logs appear only at level 3.
+# Other detailed logs appear only at level 3.
 
 type LogConfigTuple = tuple[int, LogFile, TargetLabels]
 
@@ -32,8 +31,17 @@ class LogSetup:
     debug: DebugConfig
 
     if TYPE_CHECKING:
+        from collections.abc import KeysView, ValuesView
 
-        def ensure_labels_exist(self, label: str, orig_label: str | None = None) -> None: ...
+        from .._types.aliases import IndexArg, LabelArg
+
+        def resolve_labels_and_idxs(
+            self,
+            labels: LabelArg | KeysView[str],
+            idxs: IndexArg | ValuesView[int] | None,
+            allow_symbol: bool = True,
+            is_init: bool = False,
+        ) -> tuple[tuple[str, ...], tuple[int, ...]]: ...
 
     def configure_debug(self, arg: DebugArg) -> None:
         # default: level 3, terminal output, all labels
@@ -59,19 +67,13 @@ class LogSetup:
                 self._setup_file_handler(file_path)
 
             if target_labels is not None:
-                valid_labels = []
-                for label in target_labels:
-                    try:
-                        self.ensure_labels_exist(label)
-                    except UnregisteredLabelError as e:
-                        self._logger.warning("%s", e)
-                    else:
-                        valid_labels.append(label)
-
-                if not valid_labels:
-                    target_labels = None
-                else:
-                    target_labels = tuple(valid_labels)
+                # keep labels even if some are not yet registered
+                target_labels, _ = self.resolve_labels_and_idxs(
+                    target_labels,
+                    idxs=None,
+                    allow_symbol=False,
+                    is_init=True,
+                )
 
         debug_cfg: DebugConfig = {
             "TRIGGON_LOG_VERBOSITY": log_verbosity,
@@ -108,6 +110,8 @@ class LogSetup:
                 else:
                     labels = [target_labels]
                 target_labels = [v.strip() for v in labels if v.strip()]
+                if not target_labels:
+                    target_labels = None
 
         return log_verbosity, file_path, target_labels
 
