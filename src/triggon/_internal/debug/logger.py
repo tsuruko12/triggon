@@ -9,6 +9,8 @@ from ..frames import get_callsite, get_target_frame
 from ..sentinel import _NO_VALUE
 from .setup import LOG_LABELS
 
+ADD_LABEL_LOG = "Label {label} was added"
+
 TRIGGER_LOG = "Label {label} is {state}"
 DELAY_TRIGGER_LOG = "Label {label} will be {state} after {sec}s"
 
@@ -36,6 +38,11 @@ class DebugLogger:
         elif label in target_labels:
             return True
         return False
+
+    def log_added_label(self, label: str, callsite: Callsite) -> None:
+        if not self._is_target_label(label):
+            return
+        self._logger.debug(ADD_LABEL_LOG.format(label=label), extra=_build_log_extra(callsite))
 
     def log_label_flag_change(
         self,
