@@ -43,6 +43,17 @@ class RollbackNotSupportedError(RuntimeError):
         super().__init__("Triggon.rollback() requires CPython 3.13 or later")
 
 
+class RollbackSourceError(FileNotFoundError):
+    """Raised when Triggon.rollback() cannot find the caller's source file."""
+
+    def __init__(self, filename: str) -> None:
+        self.msg = f"Triggon.rollback() could not find the caller's source file: {filename!r}"
+        super().__init__(2, self.msg, filename)
+
+    def __str__(self) -> str:
+        return self.msg
+
+
 class InactiveCaptureError(Exception):
     def __init__(self) -> None:
         super().__init__("capture_return() is not active")
