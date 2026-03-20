@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ______________________________________________________________________
 
+### [2.0.1] - 2026-03-20
+
+#### Added
+
+- Added `RollbackSourceError`, a new public error for cases where `rollback()` cannot find the caller's source file
+
+#### Fixed
+
+- Fixed `rollback()` source lookup to prevent stale `co_filename` paths after renames or cached bytecode from breaking source discovery when the module `__file__` is still available
+
 ### [2.0.0] - 2026-03-18
 
 #### Breaking Changes
