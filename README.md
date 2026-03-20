@@ -3,7 +3,7 @@
 [![PyPI](https://img.shields.io/pypi/v/triggon)](https://pypi.org/project/triggon/)
 ![Python](https://img.shields.io/pypi/pyversions/triggon)
 ![Python](https://img.shields.io/pypi/l/triggon)
-![Package Size](https://img.shields.io/badge/size-37.6kB-lightgrey)
+![Package Size](https://img.shields.io/badge/size-37.1kB-lightgrey)
 [![Downloads](https://pepy.tech/badge/triggon)](https://pepy.tech/project/triggon)
 
 ## Overview
@@ -564,6 +564,7 @@ Environment variables:
 - `UnregisteredLabelError`: an operation refers to a label that has not been registered
 - `InactiveCaptureError`: `trigger_return()` was called outside `capture_return()`
 - `RollbackNotSupportedError`: `rollback()` was used on a runtime earlier than CPython 3.13
+- `RollbackSourceError`: the caller's source file could not be found during `rollback()`
 - `UpdateError`: a registered target could not be updated or restored
 
 ## License

@@ -3,7 +3,7 @@
 [![PyPI](https://img.shields.io/pypi/v/triggon)](https://pypi.org/project/triggon/)
 ![Python](https://img.shields.io/pypi/pyversions/triggon)
 ![Python](https://img.shields.io/pypi/l/triggon)
-![Package Size](https://img.shields.io/badge/size-37.6kB-lightgrey)
+![Package Size](https://img.shields.io/badge/size-37.1kB-lightgrey)
 [![Downloads](https://pepy.tech/badge/triggon)](https://pepy.tech/project/triggon)
 
 ## 概要
@@ -561,6 +561,7 @@ print(tg.switch_lit("greet", original_val=None))
 - `UnregisteredLabelError`: 登録されていないラベルを操作しようとした場合
 - `InactiveCaptureError`: `capture_return()` の外で `trigger_return()` が呼ばれた場合
 - `RollbackNotSupportedError`: `rollback()` が CPython 3.13 より前の実行環境で使われた場合
+- `RollbackSourceError`: `rollback()` 中に呼び出し元のソースファイルを見つけられなかった場合
 - `UpdateError`: 登録された対象を更新または復元できなかった場合
 
 ## ライセンス
