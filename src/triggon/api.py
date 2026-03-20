@@ -778,6 +778,8 @@ class Triggon(_Core, _Internal):
         Raises:
             RollbackNotSupportedError:
                 If the current runtime is earlier than CPython 3.13.
+            RollbackSourceError:
+                If the caller's source file cannot be found.
             InvalidArgumentError:
                 If `targets` is empty.
             AttributeError:
