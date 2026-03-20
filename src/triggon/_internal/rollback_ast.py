@@ -1,10 +1,10 @@
 import ast
+import linecache
 from collections.abc import Mapping, Sequence
-from pathlib import Path
 from types import FrameType
 
 from ..core.value_resolver import AttrResult, VarResult, resolve_ref_info
-from ..errors.public import InvalidArgumentError, UpdateError
+from ..errors.public import InvalidArgumentError, RollbackSourceError, UpdateError
 from .keys import GLOB_VAR, LOC_VAR
 
 
@@ -12,9 +12,7 @@ def collect_rollback_refs(
     frame: FrameType,
     target_names: Sequence[str] | None,
 ) -> Mapping[str, VarResult | AttrResult]:
-    filename = frame.f_code.co_filename
-    lineno = frame.f_lineno
-    node = _find_with_node(filename, lineno)
+    node = _find_with_node(frame)
 
     if target_names is None:
         target_names = _collect_assigned_ref_names(node)
@@ -46,9 +44,10 @@ def revert_targets(frame: FrameType, name_to_refs: Mapping[str, VarResult | Attr
                 raise AssertionError(f"unreachable ref type: {type(ref)!r}")
 
 
-def _find_with_node(filename: str, lineno: int) -> ast.With:
-    source = Path(filename).read_text(encoding="utf-8")
-    tree = ast.parse(source, filename=filename)
+def _find_with_node(frame: FrameType) -> ast.With:
+    lineno = frame.f_lineno
+    source, source_name = _load_source(frame)
+    tree = ast.parse(source, filename=source_name)
 
     with_node = None
 
@@ -65,6 +64,21 @@ def _find_with_node(filename: str, lineno: int) -> ast.With:
     if with_node is None:
         raise RuntimeError("failed to locate the target rollback block")
     return with_node
+
+
+def _load_source(frame: FrameType) -> tuple[str, str]:
+    filename = frame.f_code.co_filename
+    lines = linecache.getlines(filename, frame.f_globals)
+    if lines:
+        return "".join(lines), filename
+
+    module_file = frame.f_globals.get("__file__")
+    if isinstance(module_file, str):
+        lines = linecache.getlines(module_file, frame.f_globals)
+        if lines:
+            return "".join(lines), module_file
+
+    raise RollbackSourceError(filename)
 
 
 def _collect_assigned_ref_names(node: ast.With) -> list[str]:
