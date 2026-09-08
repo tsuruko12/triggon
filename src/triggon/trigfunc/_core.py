@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import builtins
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 from types import FrameType
 from typing import Any, Literal, cast
@@ -17,8 +17,7 @@ class _Core:
     """Internal mixin for TrigFunc"""
 
     _trigcall: _TrigCall | None
-    _f_locals: Mapping[str, Any]
-    _f_globals: Mapping[str, Any]
+    _frame: FrameType
 
     def _resolve_value(
         self,
@@ -27,11 +26,9 @@ class _Core:
         frame: FrameType | None = None,
     ) -> Any:
         if frame is None:
-            f_locals = self._f_locals
-            f_globals = self._f_globals
-        else:
-            f_locals = frame.f_locals
-            f_globals = frame.f_globals
+            frame = self._frame
+        f_locals = frame.f_locals
+        f_globals = frame.f_globals
 
         if obj is _NO_VALUE:
             value = f_locals.get(name, _NO_VALUE)

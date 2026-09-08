@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from types import FrameType
 from typing import Any, Self
 
 from ._core import _Core, _TrigCall
@@ -34,31 +34,24 @@ class TrigFunc(_Core):
     """
 
     _trigcall: _TrigCall | None
-    _f_locals: Mapping[str, Any]
-    _f_globals: Mapping[str, Any]
+    _frame: FrameType
 
     # Marker for functions that use this class
     __trigfunc__ = True
 
     def __init__(self) -> None:
         self._trigcall = None
-
-        frame = get_target_frame()
-        self._f_locals = frame.f_locals
-        self._f_globals = frame.f_globals
-        frame = None
+        self._frame = get_target_frame()
 
     @classmethod
     def _clone_with(
         cls,
         tricall: _TrigCall,
-        f_locals: Mapping[str, Any],
-        f_globals: Mapping[str, Any],
+        frame: FrameType,
     ) -> Self:
         new_cls = cls.__new__(cls)
         new_cls._trigcall = tricall
-        new_cls._f_locals = f_locals
-        new_cls._f_globals = f_globals
+        new_cls._frame = frame
         return new_cls
 
     def __call__(self, *args: Any, **kwargs: Any) -> Self:
@@ -68,8 +61,7 @@ class TrigFunc(_Core):
         new_trigcall = self._trigcall.add_call(args, kwargs)
         return type(self)._clone_with(
             new_trigcall,
-            self._f_locals,
-            self._f_globals,
+            self._frame,
         )
 
     def __getattr__(self, name: str) -> Self:
@@ -80,6 +72,5 @@ class TrigFunc(_Core):
 
         return type(self)._clone_with(
             new_trigcall,
-            self._f_locals,
-            self._f_globals,
+            self._frame,
         )
