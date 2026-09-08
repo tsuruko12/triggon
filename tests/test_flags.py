@@ -1,6 +1,6 @@
 from pathlib import Path
 import sys
-from time import monotonic, sleep
+from time import sleep
 
 import pytest
 
@@ -9,17 +9,6 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from triggon import InvalidArgumentError, Triggon
-
-
-def wait_until(predicate, timeout: float = 2.0, interval: float = 0.005):
-    deadline = monotonic() + timeout
-
-    while monotonic() < deadline:
-        if predicate():
-            return
-        sleep(interval)
-
-    assert predicate()
 
 
 def test_is_triggered_reports_active_labels():
@@ -137,28 +126,26 @@ def test_revert_requires_labels_or_all():
         tg.revert()
 
 
-def test_after_delays_trigger():
+def test_after_delays_trigger(wait_until):
     tg = Triggon.from_label("A", new_values=1)
 
     tg.set_trigger("A", after=0.05)
     assert tg.is_triggered("A") is False
 
-    sleep(0.08)
-    assert tg.is_triggered("A") is True
+    wait_until(lambda: tg.is_triggered("A") is True)
 
 
-def test_after_delays_revert():
+def test_after_delays_revert(wait_until):
     tg = Triggon.from_label("A", new_values=1)
 
     tg.set_trigger("A")
     tg.revert("A", after=0.05)
     assert tg.is_triggered("A") is True
 
-    sleep(0.08)
-    assert tg.is_triggered("A") is False
+    wait_until(lambda: tg.is_triggered("A") is False)
 
 
-def test_cond_and_after_gate_delayed_trigger():
+def test_cond_and_after_gate_delayed_trigger(wait_until):
     tg = Triggon.from_label("A", new_values=1)
     enabled = False
 
@@ -172,7 +159,7 @@ def test_cond_and_after_gate_delayed_trigger():
     wait_until(lambda: tg.is_triggered("A") is True)
 
 
-def test_cond_and_after_gate_delayed_revert():
+def test_cond_and_after_gate_delayed_revert(wait_until):
     tg = Triggon.from_label("A", new_values=1)
     enabled = False
 
@@ -187,7 +174,7 @@ def test_cond_and_after_gate_delayed_revert():
     wait_until(lambda: tg.is_triggered("A") is False)
 
 
-def test_revert_reschedule_replaces_pending_delay():
+def test_revert_reschedule_replaces_pending_delay(wait_until):
     tg = Triggon.from_label("A", new_values=1)
 
     tg.set_trigger("A")
@@ -203,7 +190,7 @@ def test_revert_reschedule_replaces_pending_delay():
     assert tg.is_triggered("A") is False
 
 
-def test_staggered_trigger_delays_are_independent():
+def test_staggered_trigger_delays_are_independent(wait_until):
     tg = Triggon.from_labels({"A": 1, "B": 2, "C": 3})
 
     assert tg.is_triggered("A") is False
@@ -218,7 +205,7 @@ def test_staggered_trigger_delays_are_independent():
     wait_until(lambda: tg.is_triggered(("A", "B", "C")) is True)
 
 
-def test_staggered_revert_delays_are_independent():
+def test_staggered_revert_delays_are_independent(wait_until):
     tg = Triggon.from_labels({"A": 1, "B": 2, "C": 3})
 
     tg.set_trigger(("A", "B", "C"))

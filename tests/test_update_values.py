@@ -1,6 +1,6 @@
 from pathlib import Path
 import sys
-from time import monotonic, sleep
+from time import sleep
 from typing import cast
 
 import pytest
@@ -11,17 +11,6 @@ if ROOT not in sys.path:
 
 from triggon import InvalidArgumentError, TrigFunc, Triggon, UpdateError
 from triggon._internal.keys import REVERT, TRIGGER
-
-
-def wait_until(predicate, timeout: float = 2.0, interval: float = 0.005):
-    deadline = monotonic() + timeout
-
-    while monotonic() < deadline:
-        if predicate():
-            return
-        sleep(interval)
-
-    assert predicate()
 
 
 registered_value = 0
@@ -300,7 +289,7 @@ def test_register_refs_stay_disabled_after_revert():
     assert registered_b == 0
 
 
-def test_reschedule_replaces_pending_update():
+def test_reschedule_replaces_pending_update(wait_until):
     tg = Triggon.from_label("A", new_values=(10, 20))
     global registered_value
     registered_value = 0
@@ -370,7 +359,7 @@ def test_set_trigger_uses_double_symbol_label_for_registered_values():
     assert registered_value == 0
 
 
-def test_switch_lit_respects_cond_delayed_trigger():
+def test_switch_lit_respects_cond_delayed_trigger(wait_until):
     tg = Triggon.from_label("A", new_values=10)
     enabled = False
 
@@ -384,7 +373,7 @@ def test_switch_lit_respects_cond_delayed_trigger():
     wait_until(lambda: tg.switch_lit("A", original_val=0) == 10)
 
 
-def test_switch_lit_respects_cond_delayed_revert():
+def test_switch_lit_respects_cond_delayed_revert(wait_until):
     tg = Triggon.from_label("A", new_values=10)
     enabled = True
 
@@ -401,7 +390,7 @@ def test_switch_lit_respects_cond_delayed_revert():
     wait_until(lambda: tg.switch_lit("A", original_val=0) == 0)
 
 
-def test_register_ref_respects_cond_delayed_trigger():
+def test_register_ref_respects_cond_delayed_trigger(wait_until):
     tg = Triggon.from_label("A", new_values=10)
     global registered_value
     registered_value = 0
@@ -419,7 +408,7 @@ def test_register_ref_respects_cond_delayed_trigger():
     wait_until(lambda: registered_value == 10)
 
 
-def test_register_ref_respects_cond_delayed_revert():
+def test_register_ref_respects_cond_delayed_revert(wait_until):
     tg = Triggon.from_label("A", new_values=10)
     global registered_value
     registered_value = 0
@@ -439,7 +428,7 @@ def test_register_ref_respects_cond_delayed_revert():
     wait_until(lambda: registered_value == 0)
 
 
-def test_register_refs_follow_staggered_trigger_updates():
+def test_register_refs_follow_staggered_trigger_updates(wait_until):
     tg, holder = _make_staggered_registered_refs()
 
     assert registered_a == 0
@@ -454,7 +443,7 @@ def test_register_refs_follow_staggered_trigger_updates():
     wait_until(lambda: registered_a == 10 and registered_b == 20 and holder.value == 30)
 
 
-def test_register_refs_follow_staggered_revert_updates():
+def test_register_refs_follow_staggered_revert_updates(wait_until):
     tg, holder = _make_staggered_registered_refs()
 
     tg.set_trigger(("A", "B", "C"))
@@ -544,7 +533,7 @@ def test_register_refs_raises_when_attr_update_fails():
         tg.set_trigger("A")
 
 
-def test_delayed_trigger_failure_logs_update_err(monkeypatch):
+def test_delayed_trigger_failure_logs_update_err(monkeypatch, wait_until):
     tg = Triggon.from_label("A", new_values=10, debug=True)
     logged = []
 
@@ -577,7 +566,7 @@ def test_delayed_trigger_failure_logs_update_err(monkeypatch):
     assert "cannot apply new value" in logged[0]
 
 
-def test_delayed_trigger_failure_clears_delay_state():
+def test_delayed_trigger_failure_clears_delay_state(wait_until):
     tg = Triggon.from_label("A", new_values=10)
 
     class WriteProtected:
@@ -611,7 +600,7 @@ def test_delayed_trigger_failure_clears_delay_state():
     assert tg.is_triggered("A") is False
 
 
-def test_delayed_revert_failure_logs_update_err(monkeypatch):
+def test_delayed_revert_failure_logs_update_err(monkeypatch, wait_until):
     tg = Triggon.from_label("A", new_values=10, debug=True)
     logged = []
 
@@ -645,7 +634,7 @@ def test_delayed_revert_failure_logs_update_err(monkeypatch):
     assert "cannot restore original value" in logged[0]
 
 
-def test_delayed_revert_failure_clears_delay_state():
+def test_delayed_revert_failure_clears_delay_state(wait_until):
     tg = Triggon.from_label("A", new_values=10)
 
     class WriteOnce:

@@ -1,6 +1,5 @@
 from pathlib import Path
 import sys
-from time import monotonic, sleep
 
 ROOT = str(Path(__file__).resolve().parents[1] / "src")
 if ROOT not in sys.path:
@@ -10,17 +9,6 @@ from triggon import TrigFunc, Triggon
 
 
 debug_registered_value = 0
-
-
-def wait_until(predicate, timeout: float = 0.4, interval: float = 0.005) -> None:
-    deadline = monotonic() + timeout
-
-    while monotonic() < deadline:
-        if predicate():
-            return
-        sleep(interval)
-
-    assert predicate()
 
 
 def _flush_debug_handlers(tg: Triggon) -> None:
@@ -209,7 +197,7 @@ def test_level_3_filters_added_label_logs(monkeypatch, capsys):
     assert "Label C was added" in err
 
 
-def test_level_3_logs_delayed_trigger(monkeypatch, capsys):
+def test_level_3_logs_delayed_trigger(monkeypatch, capsys, wait_until):
     monkeypatch.setenv("TRIGGON_LOG_VERBOSITY", "3")
     tg = Triggon.from_label("A", new_values=10, debug=True)
 
@@ -223,7 +211,7 @@ def test_level_3_logs_delayed_trigger(monkeypatch, capsys):
     assert "Label 'A' is active" in err
 
 
-def test_level_3_logs_delayed_revert(monkeypatch, capsys):
+def test_level_3_logs_delayed_revert(monkeypatch, capsys, wait_until):
     monkeypatch.setenv("TRIGGON_LOG_VERBOSITY", "3")
     tg = Triggon.from_label("A", new_values=10, debug=True)
 
@@ -238,7 +226,7 @@ def test_level_3_logs_delayed_revert(monkeypatch, capsys):
     assert "Label 'A' is inactive" in err
 
 
-def test_level_3_logs_delayed_disable(monkeypatch, capsys):
+def test_level_3_logs_delayed_disable(monkeypatch, capsys, wait_until):
     monkeypatch.setenv("TRIGGON_LOG_VERBOSITY", "3")
     tg = Triggon.from_label("A", new_values=10, debug=True)
 
