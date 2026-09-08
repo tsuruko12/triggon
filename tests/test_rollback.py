@@ -10,6 +10,12 @@ if ROOT not in sys.path:
 from triggon import InvalidArgumentError, RollbackNotSupportedError, Triggon, UpdateError
 
 
+requires_rollback = pytest.mark.skipif(
+    sys.version_info < (3, 13),
+    reason="Triggon.rollback() requires CPython 3.13 or later",
+)
+
+
 def _run_explicit_restore_on_err():
     x = 1
 
@@ -96,12 +102,14 @@ def _run_nested_rollback_state():
     return run()
 
 
+@requires_rollback
 def test_rejects_invalid_targets_type():
     with pytest.raises(TypeError):
-        with Triggon.rollback(123):
+        with Triggon.rollback(123): # type: ignore[arg-type]
             pass
 
 
+@requires_rollback
 def test_rejects_empty_targets():
     with pytest.raises(InvalidArgumentError):
         with Triggon.rollback(()):
@@ -116,18 +124,21 @@ def test_raises_on_unsupported_python(monkeypatch):
             pass
 
 
+@requires_rollback
 def test_restores_explicit_loc_target_after_exc():
     x, _ = _run_explicit_restore_on_err()
 
     assert x == 1
 
 
+@requires_rollback
 def test_restores_explicit_attr_target_after_exc():
     x, holder_value = _run_explicit_restore_on_err()
 
     assert holder_value == 2
 
 
+@requires_rollback
 def test_accepts_single_str_target():
     x = 1
 
@@ -143,6 +154,7 @@ def test_accepts_single_str_target():
     run()
 
 
+@requires_rollback
 def test_auto_collect_restores_loc_assignments():
     inside, outside = _run_auto_collect_assignments()
 
@@ -150,6 +162,7 @@ def test_auto_collect_restores_loc_assignments():
     assert outside[0] == 1
 
 
+@requires_rollback
 def test_auto_collect_restores_augassigns():
     inside, outside = _run_auto_collect_assignments()
 
@@ -157,6 +170,7 @@ def test_auto_collect_restores_augassigns():
     assert outside[1] == 10
 
 
+@requires_rollback
 def test_auto_collect_restores_attr_assignments():
     inside, outside = _run_auto_collect_assignments()
 
@@ -164,6 +178,7 @@ def test_auto_collect_restores_attr_assignments():
     assert outside[2] == 2
 
 
+@requires_rollback
 def test_auto_collect_restores_annotated_assignments():
     def run():
         x = 1
@@ -177,6 +192,7 @@ def test_auto_collect_restores_annotated_assignments():
     run()
 
 
+@requires_rollback
 def test_auto_collect_restores_existing_locals():
     inside, outside = _run_auto_collect_with_new_local()
 
@@ -184,6 +200,7 @@ def test_auto_collect_restores_existing_locals():
     assert outside[0] == 1
 
 
+@requires_rollback
 def test_auto_collect_keeps_new_locals():
     inside, outside = _run_auto_collect_with_new_local()
 
@@ -191,6 +208,7 @@ def test_auto_collect_keeps_new_locals():
     assert outside[1] == 7
 
 
+@requires_rollback
 def test_ignores_unresolvable_targets():
     x = 1
 
@@ -206,6 +224,7 @@ def test_ignores_unresolvable_targets():
     run()
 
 
+@requires_rollback
 def test_nested_restores_inner_scope_state():
     inner, after_inner, _ = _run_nested_rollback_state()
 
@@ -213,12 +232,14 @@ def test_nested_restores_inner_scope_state():
     assert after_inner == 2
 
 
+@requires_rollback
 def test_nested_restores_outer_scope_state():
     _, _, after_outer = _run_nested_rollback_state()
 
     assert after_outer == 1
 
 
+@requires_rollback
 def test_raises_update_err_when_attr_restore_fails():
     class WriteOnce:
         def __init__(self):

@@ -1,7 +1,8 @@
 import ast
 from pathlib import Path
 import sys
-from types import SimpleNamespace
+from types import FrameType, SimpleNamespace
+from typing import cast
 from uuid import uuid4
 
 ROOT = str(Path(__file__).resolve().parents[1] / "src")
@@ -27,7 +28,7 @@ def test_find_with_node_falls_back_to_module_file():
             f_globals={"__file__": str(source_path)},
         )
 
-        node = _find_with_node(frame)
+        node = _find_with_node(cast(FrameType, frame))
 
         assert isinstance(node, ast.With)
         assert node.lineno == 2
@@ -43,4 +44,4 @@ def test_find_with_node_raises_on_missing_source():
     )
 
     with pytest.raises(RollbackSourceError, match=r"Triggon\.rollback\(\) could not find"):
-        _find_with_node(frame)
+        _find_with_node(cast(FrameType, frame))
