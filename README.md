@@ -143,6 +143,8 @@ Keyword arguments:
 - `after`: delay label activation in seconds
 - `reschedule`: replace an existing scheduled activation for the same labels
 
+Note: Timer execution may be delayed by system scheduling.
+
 ```python
 from triggon import Triggon
 
@@ -353,6 +355,8 @@ Keyword arguments:
 - `cond`: only deactivate the labels if the condition evaluates to true
 - `after`: delay label deactivation in seconds
 - `reschedule`: replace an existing scheduled deactivation for the same labels
+
+Note: Timer execution may be delayed by system scheduling.
 
 ```python
 from triggon import Triggon

@@ -144,6 +144,8 @@ set_trigger(
 - `after`: 指定秒数後にラベルを有効化します
 - `reschedule`: 同じラベル群に対する既存の遅延予約を置き換えます
 
+補足: タイマーの実行は、システムのスケジューリングによって遅れる場合があります。
+
 ```python
 from triggon import Triggon
 
@@ -350,6 +352,8 @@ revert(
 - `cond`: 条件が `True` の場合のみラベルの無効化を適用します
 - `after`: 指定秒数後にラベルを無効化します
 - `reschedule`: 同じラベル群に対する既存の遅延予約を置き換えます
+
+補足: タイマーの実行は、システムのスケジューリングによって遅れる場合があります。
 
 ```python
 from triggon import Triggon
