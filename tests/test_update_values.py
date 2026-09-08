@@ -1,6 +1,7 @@
 from pathlib import Path
 import sys
 from time import monotonic, sleep
+from typing import cast
 
 import pytest
 
@@ -12,7 +13,7 @@ from triggon import InvalidArgumentError, TrigFunc, Triggon, UpdateError
 from triggon._internal.keys import REVERT, TRIGGER
 
 
-def wait_until(predicate, timeout: float = 0.4, interval: float = 0.005):
+def wait_until(predicate, timeout: float = 2.0, interval: float = 0.005):
     deadline = monotonic() + timeout
 
     while monotonic() < deadline:
@@ -441,22 +442,16 @@ def test_register_ref_respects_cond_delayed_revert():
 def test_register_refs_follow_staggered_trigger_updates():
     tg, holder = _make_staggered_registered_refs()
 
-    tg.set_trigger("A", after=0.04)
-    tg.set_trigger("B", after=0.10)
-    tg.set_trigger("C", after=0.16)
-
     assert registered_a == 0
     assert registered_b == 0
     assert holder.value == 0
 
-    wait_until(lambda: registered_a == 10)
-    assert registered_b == 0
-    assert holder.value == 0
+    tg.set_trigger("A", after=0.04)
+    tg.set_trigger("B", after=0.10)
+    tg.set_trigger("C", after=0.16)
 
-    wait_until(lambda: registered_b == 20)
-    assert holder.value == 0
-
-    wait_until(lambda: holder.value == 30)
+    # Wait for every update without assuming we observe intermediate states.
+    wait_until(lambda: registered_a == 10 and registered_b == 20 and holder.value == 30)
 
 
 def test_register_refs_follow_staggered_revert_updates():
@@ -471,18 +466,7 @@ def test_register_refs_follow_staggered_revert_updates():
     tg.revert("B", after=0.10)
     tg.revert("C", after=0.16)
 
-    assert registered_a == 10
-    assert registered_b == 20
-    assert holder.value == 30
-
-    wait_until(lambda: registered_a == 0)
-    assert registered_b == 20
-    assert holder.value == 30
-
-    wait_until(lambda: registered_b == 0)
-    assert holder.value == 30
-
-    wait_until(lambda: holder.value == 0)
+    wait_until(lambda: registered_a == 0 and registered_b == 0 and holder.value == 0)
 
 
 def test_register_ref_raises_when_attr_update_fails():

@@ -1,14 +1,23 @@
-from collections.abc import Iterator, Mapping
+from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
+import logging
+import threading
 from typing import Any, Self
 
 from ._internal._types.aliases import (
     DebugArg,
+    DelayKey,
     IndexArg,
     LabelArg,
     LabelToRefs,
     NameArg,
+)
+from ._internal._types.structs import (
+    DebugConfig,
+    DelayState,
+    RefMeta,
+    RefsByKind,
 )
 
 @dataclass(slots=True)
@@ -17,6 +26,17 @@ class EarlyReturnResult:
     value: Any = None
 
 class Triggon:
+    debug: DebugConfig
+    _logger: logging.Logger | None
+    _label_is_active: dict[str, bool]
+    _label_delay_state: dict[str, dict[DelayKey, DelayState]]
+    _label_is_perm_disabled: dict[str, bool]
+    _new_values: dict[str, tuple[Any, ...]]
+    _label_refs: dict[str, RefsByKind]
+    _id_meta: dict[int, RefMeta]
+    _latest_id: int
+    _return_val_stack: list[Any]
+    _lock: threading.Lock
     @classmethod
     def from_label(
         cls,
@@ -84,9 +104,9 @@ class Triggon:
     ) -> None: ...
     @staticmethod
     @contextmanager
-    def rollback(targets: NameArg | None = None) -> Iterator[None]: ...
+    def rollback(targets: NameArg | None = None) -> Generator[None]: ...
     @contextmanager
-    def capture_return(self) -> Iterator[EarlyReturnResult]: ...
+    def capture_return(self) -> Generator[EarlyReturnResult]: ...
     def trigger_return(
         self,
         labels: LabelArg,

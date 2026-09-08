@@ -2,7 +2,7 @@ import logging
 import sys
 import threading
 from contextlib import contextmanager
-from collections.abc import Iterator, KeysView, Mapping, Sequence, ValuesView
+from collections.abc import Generator, KeysView, Mapping, Sequence, ValuesView
 from dataclasses import dataclass
 from typing import Any, Self
 
@@ -761,7 +761,7 @@ class Triggon(_Core, _Internal):
 
     @staticmethod
     @contextmanager
-    def rollback(targets: NameArg | None = None) -> Iterator[None]:
+    def rollback(targets: NameArg | None = None) -> Generator[None]:
         """Temporarily mutate names and restore their original values on exit.
 
         The original values are restored when leaving the context, even if an
@@ -806,7 +806,7 @@ class Triggon(_Core, _Internal):
             revert_targets(frame, name_to_refs)
 
     @contextmanager
-    def capture_return(self) -> Iterator[EarlyReturnResult]:
+    def capture_return(self) -> Generator[EarlyReturnResult]:
         """Capture an early return triggered by `trigger_return()`.
 
         `trigger_return()` is active only inside this context. If it is
