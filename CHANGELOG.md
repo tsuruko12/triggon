@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ______________________________________________________________________
 
+### [2.0.2] - 2026-09-08
+
+#### Fixed
+
+- Fixed `NameError` in deferred calls on Python 3.12 when the target function or object was defined after `TrigFunc` creation
+
 ### [2.0.1] - 2026-03-20
 
 #### Added
