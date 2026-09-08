@@ -342,9 +342,8 @@ class Triggon(_Core, _Internal):
                 An expression that is evaluated at call time. The labels are
                 activated only if it evaluates to True.
             after (int | float, optional):
-                Delay in seconds before the labels become active. Even when a
-                smaller value is given, the actual delay is about 0.011
-                seconds or longer.
+                Delay in seconds before the labels are deactivated. The actual delay
+                may be longer depending on thread scheduling and the environment.
             reschedule (bool, optional):
                 If True, replace any existing scheduled trigger for the same
                 labels.
@@ -714,9 +713,8 @@ class Triggon(_Core, _Internal):
                 An expression that is evaluated at call time. The labels are
                 deactivated only if it evaluates to True.
             after (int | float, optional):
-                Delay in seconds before the labels are deactivated. Even when a
-                smaller value is given, the actual delay is about 0.011
-                seconds or longer.
+                Delay in seconds before the labels are deactivated. The actual delay
+                may be longer depending on thread scheduling and the environment.
             reschedule (bool, optional):
                 If True, replace any existing scheduled revert for the same
                 labels.
